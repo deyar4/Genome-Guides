@@ -32,7 +32,7 @@ jobs:
           - 6379:6379
 
     steps:
-- uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
       # 1. Official UV action to ensure it's in the PATH
       - name: Install uv
