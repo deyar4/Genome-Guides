@@ -1,0 +1,83 @@
+name: Genome Guides CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-lint-and-test:
+    name: Backend CI (Python + FastAPI)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: genome_guides_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+- uses: actions/checkout@v4
+      
+      # 1. Official UV action to ensure it's in the PATH
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies & Run Pytest
+        env:
+          #  Connection strings so tests can reach the services
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/genome_guides_test
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          cd apps/backend
+          uv sync
+          uv run pytest --cov=app tests/
+
+  frontend-ci:
+    name: Frontend CI (Next.js + TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      #  Setup pnpm ...
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+          
+      # ...so that setup-node can cache it.
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies & Build
+        # 4. Install at root, then run commands specific to the web app
+        run: |
+          pnpm install
+          pnpm run lint --filter web
+          pnpm run build --filter web

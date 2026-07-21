@@ -1,0 +1,33 @@
+name: 🚀 Feature Request
+description: Propose a new feature, module, or UI enhancement
+title: "[FEATURE]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to suggest a new feature!
+  - type: input
+    id: feature-name
+    attributes:
+      label: Feature Name
+      description: A brief title for the proposed feature
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Which area of the project does this impact?
+      options:
+        - Frontend / UI / UX
+        - Backend API / Database / Storage
+        - Core Analytics / Algorithms
+        - CLI / Tooling / Integrations
+        - Documentation / Other
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed Description
+      description: Explain the motivation, use cases, and technical details for this feature. What problem does it solve?
+    validations:
+      required: true
