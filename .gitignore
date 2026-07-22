@@ -34,3 +34,7 @@ htmlcov/
 # Operating System
 .DS_Store
 Thumbs.db
+
+# Snakemake cache
+.snakemake/
+
