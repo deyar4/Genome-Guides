@@ -1,0 +1,50 @@
+# Genome Guides - Primary Snakemake Workflow Entrypoint
+
+configfile: "packages/pipeline/config.yaml"
+
+include: "rules/common.smk"
+include: "rules/data.smk"
+include: "rules/trivial_cli.smk"
+include: "rules/dna.smk"
+include: "rules/genes.smk"
+include: "rules/proteins.smk"
+include: "rules/hecate.smk"
+
+rule all:
+    input:
+        "data/raw/tiny.fa.fai",
+        "data/tracks/tiny/all/gc_content.parquet",
+        "data/tracks/tiny/all/assembly_gaps.parquet",
+        "data/tracks/tiny/all/sequence_stats.txt"
+
+rule chrm_all:
+    input:
+        "data/raw/chrm.fa.fai",
+        "data/tracks/chrm/all/gc_content.parquet",
+        "data/tracks/chrm/all/assembly_gaps.parquet",
+        "data/tracks/chrm/all/sequence_stats.txt"
+
+rule t2t_all:
+    input:
+        "data/raw/t2t.fa.fai",
+        "data/tracks/t2t/all/gc_content.parquet",
+        "data/tracks/t2t/all/assembly_gaps.parquet",
+        "data/tracks/t2t/all/cpg_islands.parquet",
+        "data/tracks/t2t/all/kmers_3mer.parquet",
+        "data/tracks/t2t/all/kmers_6mer.parquet",
+        "data/tracks/t2t/all/shannon_entropy.parquet",
+        "data/tracks/t2t/all/dinucleotide_frequencies.parquet",
+        "data/tracks/t2t/all/homopolymer_genomic_tracts.parquet",
+        "data/tracks/t2t/all/gene_models.parquet",
+        "data/tracks/t2t/all/gene_density.parquet",
+        "data/tracks/t2t/all/gene_biotype_census.parquet",
+        "data/tracks/t2t/all/gene_spacing.parquet",
+        "data/tracks/t2t/all/gene_overlaps.parquet",
+        "data/tracks/t2t/all/repeatmasker_families.parquet",
+        "data/tracks/t2t/all/repeatmasker_density.parquet",
+        "data/tracks/t2t/all/ncrna_detailed_census.parquet",
+        "data/tracks/t2t/all/gene_isoform_counts.parquet",
+        "data/tracks/t2t/all/amino_acid_composition.parquet",
+        "data/tracks/t2t/all/protein_homopolymers.parquet",
+        "data/tracks/t2t/all/protein_terminal_bias.parquet",
+        "data/tracks/t2t/all/sequence_stats.txt"

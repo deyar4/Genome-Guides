@@ -1,0 +1,21 @@
+# Genome Guides - Pipeline Configuration
+
+data_dir: "data"
+raw_dir: "data/raw"
+interim_dir: "data/interim"
+tracks_dir: "data/tracks"
+
+defaults:
+  window_size: 1000
+  step_size: 1000
+  threads: 8
+
+tracks:
+  gc_content:
+    enabled: true
+    window_size: 1000
+    step_size: 1000
+  hecate_bwt:
+    enabled: true
+    kmer_length: 21
+    window_size: 100

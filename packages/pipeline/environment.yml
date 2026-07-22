@@ -1,0 +1,16 @@
+name: genome-guides-pipeline
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.11
+  - snakemake-minimal>=7.30
+  - seqkit>=2.8.0
+  - samtools>=1.19
+  - bedtools>=2.31
+  - datamash>=1.8
+  - pyarrow>=14.0
+  - duckdb>=0.9
+  - pandas>=2.1
+  - pyyaml>=6.0
