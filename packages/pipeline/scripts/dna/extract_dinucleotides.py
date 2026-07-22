@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Genome Guides - Dinucleotide Frequency & Odds Ratio Extractor
-Calculates all 16 dinucleotide frequencies and odds ratios rho_XY = f_XY / (f_X * f_Y).
+Calculates all 16 dinucleotide frequencies and odds ratios using NumPy for C-speed processing.
 """
 
 import sys
 import argparse
 from pathlib import Path
-from collections import Counter
+import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -24,25 +24,54 @@ def process_dinucleotides(fasta_path: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    single_counts = Counter()
-    dinucl_counts = Counter()
+    single_counts = np.zeros(4, dtype=np.uint64)
+    dinucl_counts = np.zeros(16, dtype=np.uint64)
+
+    # Mapping characters to 0 (A/a), 1 (C/c), 2 (G/g), 3 (T/t)
+    mapping = np.zeros(256, dtype=np.uint8)
+    mapping[ord('A')] = 0; mapping[ord('a')] = 0
+    mapping[ord('C')] = 1; mapping[ord('c')] = 1
+    mapping[ord('G')] = 2; mapping[ord('g')] = 2
+    mapping[ord('T')] = 3; mapping[ord('t')] = 3
 
     current_contig = None
     seq_chunks = []
 
-    def analyze_seq(seq):
-        seq_u = seq.upper()
-        l = len(seq_u)
-        for i in range(l - 1):
-            b1 = seq_u[i]
-            b2 = seq_u[i+1]
-            if b1 in BASES:
-                single_counts[b1] += 1
-            din = b1 + b2
-            if din in DINUCLEOTIDES:
-                dinucl_counts[din] += 1
-        if l > 0 and seq_u[-1] in BASES:
-            single_counts[seq_u[-1]] += 1
+    def analyze_seq(seq_str):
+        nonlocal single_counts, dinucl_counts
+        if len(seq_str) < 2:
+            if len(seq_str) == 1 and seq_str[0].upper() in BASES:
+                idx = "ACGT".index(seq_str[0].upper())
+                single_counts[idx] += 1
+            return
+
+        # Convert to numpy byte array (ASCII values)
+        arr = np.frombuffer(seq_str.encode('ascii', errors='ignore'), dtype=np.uint8)
+        
+        # Check validity (only ACGT or acgt)
+        is_valid_char = (arr == ord('A')) | (arr == ord('a')) | \
+                         (arr == ord('C')) | (arr == ord('c')) | \
+                         (arr == ord('G')) | (arr == ord('g')) | \
+                         (arr == ord('T')) | (arr == ord('t'))
+        
+        # Count singles
+        valid_singles = arr[is_valid_char]
+        if len(valid_singles) > 0:
+            mapped_singles = mapping[valid_singles]
+            single_counts += np.bincount(mapped_singles, minlength=4).astype(np.uint64)
+            
+        # Count dinucleotides
+        from numpy.lib.stride_tricks import sliding_window_view
+        valid_windows = sliding_window_view(is_valid_char, 2).all(axis=-1)
+        
+        if np.any(valid_windows):
+            mapped_all = mapping[arr]
+            windows = sliding_window_view(mapped_all, 2)
+            valid_mapped = windows[valid_windows]
+            
+            # Encode (first_base * 4 + second_base)
+            encoded = valid_mapped[:, 0].astype(np.uint64) * 4 + valid_mapped[:, 1].astype(np.uint64)
+            dinucl_counts += np.bincount(encoded, minlength=16).astype(np.uint64)
 
     with open(fasta_path, "r") as fa_f:
         for line in fa_f:
@@ -59,20 +88,22 @@ def process_dinucleotides(fasta_path: str, out_dir: str):
         if current_contig and seq_chunks:
             analyze_seq("".join(seq_chunks))
 
-    total_single = sum(single_counts.values()) or 1
-    total_dinucl = sum(dinucl_counts.values()) or 1
+    total_single = np.sum(single_counts) or 1
+    total_dinucl = np.sum(dinucl_counts) or 1
 
     rows = []
-    for din in DINUCLEOTIDES:
-        b1, b2 = din[0], din[1]
-        f_din = dinucl_counts[din] / total_dinucl
-        f_b1 = single_counts[b1] / total_single
-        f_b2 = single_counts[b2] / total_single
+    for i, din in enumerate(DINUCLEOTIDES):
+        b1_idx = i // 4
+        b2_idx = i % 4
+        
+        f_din = dinucl_counts[i] / total_dinucl
+        f_b1 = single_counts[b1_idx] / total_single
+        f_b2 = single_counts[b2_idx] / total_single
         
         odds_ratio = (f_din / (f_b1 * f_b2)) if (f_b1 * f_b2) > 0 else 0.0
         pct = f_din * 100.0
         
-        rows.append((din, dinucl_counts[din], float(pct), float(odds_ratio)))
+        rows.append((din, int(dinucl_counts[i]), float(pct), float(odds_ratio)))
 
     schema = pa.schema([
         ("dinucleotide", pa.string()),
