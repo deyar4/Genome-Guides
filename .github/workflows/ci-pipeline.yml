@@ -34,7 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # 1. Official UV action to ensure it's in the PATH
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -48,7 +47,6 @@ jobs:
 
       - name: Install Dependencies & Run Pytest
         env:
-          #  Connection strings so tests can reach the services
           DATABASE_URL: postgresql://postgres:password@localhost:5432/genome_guides_test
           REDIS_URL: redis://localhost:6379/0
         run: |
@@ -57,29 +55,25 @@ jobs:
           uv run pytest --cov=app tests/
 
   frontend-ci:
-    name: Frontend CI (Next.js + TypeScript)
+    name: Frontend CI (Next.js 15 + TypeScript)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
       
-      #  Setup pnpm ...
       - name: Install pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9
           
-      # ...so that setup-node can cache it.
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'pnpm'
-          cache-dependency-path: '**/pnpm-lock.yaml'
 
-      - name: Install Dependencies & Build
-        # 4. Install at root, then run commands specific to the web app
+      - name: Install Dependencies & Build Web App
         run: |
           pnpm install
-          pnpm run lint --filter web
-          pnpm run build --filter web
+          pnpm --filter web run lint
+          pnpm --filter web run build
