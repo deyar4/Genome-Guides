@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Genome Guides - Fast K-Mer Frequency Spectrum Generator
-Counts 3-mer (codon) and 6-mer (hexamer) frequencies across contigs into Parquet format using NumPy.
+Counts 3-mer (codon) and 6-mer (hexamer) frequencies using memory-efficient fast FASTA reading and NumPy.
 """
 
 import sys
@@ -34,58 +34,45 @@ def process_kmers(fasta_path: str, out_dir: str, kmer_len: int):
 
     powers = 4 ** np.arange(kmer_len - 1, -1, -1, dtype=np.uint64)
 
-    current_contig = None
-    seq_chunks = []
-
     def count_sequence_kmers(seq_str):
         nonlocal global_counts
         if len(seq_str) < kmer_len:
             return
 
-        # Convert to numpy byte array (ASCII values)
         arr = np.frombuffer(seq_str.encode('ascii', errors='ignore'), dtype=np.uint8)
-        
-        # Check validity (only ACGT or acgt)
         is_valid_char = (arr == ord('A')) | (arr == ord('a')) | \
                          (arr == ord('C')) | (arr == ord('c')) | \
                          (arr == ord('G')) | (arr == ord('g')) | \
                          (arr == ord('T')) | (arr == ord('t'))
         
-        # Check sliding windows of validity
         from numpy.lib.stride_tricks import sliding_window_view
         valid_windows = sliding_window_view(is_valid_char, kmer_len).all(axis=-1)
         
         if not np.any(valid_windows):
             return
 
-        # Map characters to 0-3
         mapped = mapping[arr]
         windows = sliding_window_view(mapped, kmer_len)
-        
-        # Keep only the fully valid ACGT windows
         valid_mapped = windows[valid_windows]
         
-        # Encode sliding windows into integers using dot product
         encoded = np.dot(valid_mapped.astype(np.uint64), powers)
-        
-        # Aggregate count spectrum
         counts = np.bincount(encoded, minlength=num_bins)
         global_counts += counts.astype(np.uint64)
 
+    # Read the whole FASTA file at once and split by '>' (extremely fast I/O)
     with open(fasta_path, "r") as fa_f:
-        for line in fa_f:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                if current_contig and seq_chunks:
-                    count_sequence_kmers("".join(seq_chunks))
-                    seq_chunks = []
-                current_contig = line[1:].split()[0]
-            else:
-                seq_chunks.append(line)
-        if current_contig and seq_chunks:
-            count_sequence_kmers("".join(seq_chunks))
+        data = fa_f.read()
+
+    parts = data.split(">")
+    for part in parts:
+        if not part:
+            continue
+        lines = part.split("\n", 1)
+        if len(lines) < 2:
+            continue
+        # Strip newlines from sequence
+        seq_str = lines[1].replace("\n", "")
+        count_sequence_kmers(seq_str)
 
     # Decode integers back to k-mer strings
     kmers = []
@@ -101,7 +88,6 @@ def process_kmers(fasta_path: str, out_dir: str, kmer_len: int):
     total_counts = np.sum(global_counts)
     total_counts = total_counts if total_counts > 0 else 1
 
-    # Only include non-zero counts to keep files compact (especially for large k)
     valid_indices = global_counts > 0
     rows = []
     for idx in np.where(valid_indices)[0]:

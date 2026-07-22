@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Genome Guides - Dinucleotide Frequency & Odds Ratio Extractor
-Calculates all 16 dinucleotide frequencies and odds ratios using NumPy for C-speed processing.
+Calculates all 16 dinucleotide frequencies and odds ratios using fast FASTA splitting and NumPy.
 """
 
 import sys
@@ -34,9 +34,6 @@ def process_dinucleotides(fasta_path: str, out_dir: str):
     mapping[ord('G')] = 2; mapping[ord('g')] = 2
     mapping[ord('T')] = 3; mapping[ord('t')] = 3
 
-    current_contig = None
-    seq_chunks = []
-
     def analyze_seq(seq_str):
         nonlocal single_counts, dinucl_counts
         if len(seq_str) < 2:
@@ -45,22 +42,18 @@ def process_dinucleotides(fasta_path: str, out_dir: str):
                 single_counts[idx] += 1
             return
 
-        # Convert to numpy byte array (ASCII values)
         arr = np.frombuffer(seq_str.encode('ascii', errors='ignore'), dtype=np.uint8)
         
-        # Check validity (only ACGT or acgt)
         is_valid_char = (arr == ord('A')) | (arr == ord('a')) | \
                          (arr == ord('C')) | (arr == ord('c')) | \
                          (arr == ord('G')) | (arr == ord('g')) | \
                          (arr == ord('T')) | (arr == ord('t'))
         
-        # Count singles
         valid_singles = arr[is_valid_char]
         if len(valid_singles) > 0:
             mapped_singles = mapping[valid_singles]
             single_counts += np.bincount(mapped_singles, minlength=4).astype(np.uint64)
             
-        # Count dinucleotides
         from numpy.lib.stride_tricks import sliding_window_view
         valid_windows = sliding_window_view(is_valid_char, 2).all(axis=-1)
         
@@ -69,24 +62,22 @@ def process_dinucleotides(fasta_path: str, out_dir: str):
             windows = sliding_window_view(mapped_all, 2)
             valid_mapped = windows[valid_windows]
             
-            # Encode (first_base * 4 + second_base)
             encoded = valid_mapped[:, 0].astype(np.uint64) * 4 + valid_mapped[:, 1].astype(np.uint64)
             dinucl_counts += np.bincount(encoded, minlength=16).astype(np.uint64)
 
+    # Read the whole FASTA file at once and split by '>' (extremely fast I/O)
     with open(fasta_path, "r") as fa_f:
-        for line in fa_f:
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith(">"):
-                if current_contig and seq_chunks:
-                    analyze_seq("".join(seq_chunks))
-                    seq_chunks = []
-                current_contig = line[1:].split()[0]
-            else:
-                seq_chunks.append(line)
-        if current_contig and seq_chunks:
-            analyze_seq("".join(seq_chunks))
+        data = fa_f.read()
+
+    parts = data.split(">")
+    for part in parts:
+        if not part:
+            continue
+        lines = part.split("\n", 1)
+        if len(lines) < 2:
+            continue
+        seq_str = lines[1].replace("\n", "")
+        analyze_seq(seq_str)
 
     total_single = np.sum(single_counts) or 1
     total_dinucl = np.sum(dinucl_counts) or 1
