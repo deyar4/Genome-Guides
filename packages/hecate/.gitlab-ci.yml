@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Kamila Szewczyk
+
+stages:
+  - check
+
+variables:
+  # Keep downloaded crates inside the project dir so GitLab's cache can
+  # archive them between runs.
+  CARGO_HOME: "${CI_PROJECT_DIR}/.cargo"
+  # Print a backtrace on test failures.
+  RUST_BACKTRACE: "1"
+
+cache:
+  key: "cargo-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cargo/registry/
+    - .cargo/git/
+
+.rust:
+  image: rust:latest
+
+# Verify that a release build succeeds (LTO + codegen-units=1 can surface
+# errors that debug builds miss).
+build-release:
+  extends: .rust
+  stage: check
+  script:
+    - cargo build --release --locked
+
+# Run the full test suite (debug build, same as `make test`).
+# Note: the Makefile has no `check` target; `cargo test` is the equivalent.
+test:
+  extends: .rust
+  stage: check
+  script:
+    - cargo test --locked

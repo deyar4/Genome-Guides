@@ -1,0 +1,11 @@
+target/
+/*.fa
+/*.he
+/*.org
+/*.svg
+perf.data
+perf.data.old
+*.2fs
+*.2fh
+docs/
+attic/

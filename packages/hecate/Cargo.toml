@@ -1,0 +1,42 @@
+[package]
+name = "hecate"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+zstd = { version = "0.13", features = ["zstdmt"] }
+libsais-sys = { version = "0.1", features = ["openmp"] }
+openmp-sys = { version = "1.2", features = ["static"] }
+memmap2 = "0.9"
+memchr = "2.7"
+crc32c = "0.6"
+regex = { version = "1.10", features = ["std"] }
+rayon = "1.10"
+num_cpus = "1.17"
+shell-words = "1.1"
+libc = "0.2"
+log = "0.4"
+env_logger = "0.11"
+liblzma = { version = "0.4.6", features = ["parallel"] }
+liblzma-sys = "0.4.6"
+
+[build-dependencies]
+cc = "1"
+
+[patch.crates-io]
+libsais-sys = { path = "vendor/libsais-sys" }
+
+[dev-dependencies]
+tempfile = "3.10"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "encode_2bit"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
