@@ -16,6 +16,14 @@ tracks:
     window_size: 1000
     step_size: 1000
   hecate_bwt:
-    enabled: true
+    enabled: false
     kmer_length: 21
     window_size: 100
+  ssr:
+    enabled: true
+    window_size: 1000000
+    min_period: 1
+    max_period: 6
+  isochores:
+    enabled: true
+    thresholds: [37, 41, 46, 53]

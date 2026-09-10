@@ -2,13 +2,13 @@
 """
 Genome Guides - Gene Spacing & Intergenic Distance Extractor
 Calculates intergenic distances between consecutive genes and flags gene overlap pairs.
+Optimized, vectorized version using polars.
 """
 
 import sys
 import argparse
 from pathlib import Path
-import pyarrow as pa
-import pyarrow.parquet as pq
+import polars as pl
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract Gene Spacing & Overlaps.")
@@ -20,68 +20,73 @@ def process_spacing(input_parquet: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    table = pq.read_table(input_parquet)
-    df = table.to_pandas()
+    sp_schema = {
+        "contig": pl.Utf8,
+        "gene1_id": pl.Utf8,
+        "gene2_id": pl.Utf8,
+        "intergenic_dist": pl.UInt32
+    }
+    ov_schema = {
+        "contig": pl.Utf8,
+        "gene1_id": pl.Utf8,
+        "gene2_id": pl.Utf8,
+        "overlap_len": pl.UInt32,
+        "same_strand": pl.UInt8
+    }
 
-    spacing_rows = []
-    overlap_rows = []
+    try:
+        df = pl.read_parquet(input_parquet)
+    except Exception:
+        df = pl.DataFrame()
 
-    grouped = df.groupby("contig")
-    for contig, group in grouped:
-        sorted_genes = group.sort_values("start_pos").to_dict("records")
-        for i in range(len(sorted_genes) - 1):
-            g1 = sorted_genes[i]
-            g2 = sorted_genes[i + 1]
+    if df.is_empty():
+        pl.DataFrame(schema=sp_schema).write_parquet(out_p / "gene_spacing.parquet", compression="zstd")
+        pl.DataFrame(schema=ov_schema).write_parquet(out_p / "gene_overlaps.parquet", compression="zstd")
+        print("Created empty spacing and overlap tables (empty input).")
+        return
 
-            if g2["start_pos"] > g1["end_pos"]:
-                dist = g2["start_pos"] - g1["end_pos"]
-                spacing_rows.append((contig, g1["gene_id"], g2["gene_id"], int(dist)))
-            else:
-                overlap_len = g1["end_pos"] - g2["start_pos"]
-                same_strand = 1 if g1["strand"] == g2["strand"] else 0
-                overlap_rows.append((contig, g1["gene_id"], g2["gene_id"], int(overlap_len), same_strand))
+    df = df.sort(["contig", "start_pos"])
 
-    # 1. Write Gene Spacing Parquet
-    sp_schema = pa.schema([
-        ("contig", pa.string()),
-        ("gene1_id", pa.string()),
-        ("gene2_id", pa.string()),
-        ("intergenic_dist", pa.uint32())
+    df = df.with_columns([
+        pl.col("start_pos").shift(-1).over("contig").alias("next_start_pos"),
+        pl.col("gene_id").shift(-1).over("contig").alias("next_gene_id"),
+        pl.col("strand").shift(-1).over("contig").alias("next_strand")
     ])
 
-    sp_table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in spacing_rows], type=pa.string()),
-            pa.array([r[1] for r in spacing_rows], type=pa.string()),
-            pa.array([r[2] for r in spacing_rows], type=pa.string()),
-            pa.array([r[3] for r in spacing_rows], type=pa.uint32()),
-        ], schema=sp_schema)
-    ]) if spacing_rows else pa.Table.from_batches([], schema=sp_schema)
+    valid_pairs = df.drop_nulls(subset=["next_start_pos", "next_gene_id"])
 
-    pq.write_table(sp_table, out_p / "gene_spacing.parquet", compression="ZSTD")
-    print(f"Created gene_spacing.parquet with {len(spacing_rows)} consecutive gene pairs.")
+    spacing_df = valid_pairs.filter(pl.col("next_start_pos") > pl.col("end_pos"))
+    if not spacing_df.is_empty():
+        sp_df = spacing_df.with_columns(
+            (pl.col("next_start_pos") - pl.col("end_pos")).cast(pl.UInt32).alias("intergenic_dist")
+        ).select([
+            pl.col("contig"),
+            pl.col("gene_id").alias("gene1_id"),
+            pl.col("next_gene_id").alias("gene2_id"),
+            pl.col("intergenic_dist")
+        ])
+    else:
+        sp_df = pl.DataFrame(schema=sp_schema)
 
-    # 2. Write Gene Overlaps Parquet
-    ov_schema = pa.schema([
-        ("contig", pa.string()),
-        ("gene1_id", pa.string()),
-        ("gene2_id", pa.string()),
-        ("overlap_len", pa.uint32()),
-        ("same_strand", pa.uint8())
-    ])
+    overlap_df = valid_pairs.filter(pl.col("next_start_pos") <= pl.col("end_pos"))
+    if not overlap_df.is_empty():
+        ov_df = overlap_df.with_columns([
+            (pl.col("end_pos") - pl.col("next_start_pos")).cast(pl.UInt32).alias("overlap_len"),
+            (pl.col("strand") == pl.col("next_strand")).cast(pl.UInt8).alias("same_strand")
+        ]).select([
+            pl.col("contig"),
+            pl.col("gene_id").alias("gene1_id"),
+            pl.col("next_gene_id").alias("gene2_id"),
+            pl.col("overlap_len"),
+            pl.col("same_strand")
+        ])
+    else:
+        ov_df = pl.DataFrame(schema=ov_schema)
 
-    ov_table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in overlap_rows], type=pa.string()),
-            pa.array([r[1] for r in overlap_rows], type=pa.string()),
-            pa.array([r[2] for r in overlap_rows], type=pa.string()),
-            pa.array([r[3] for r in overlap_rows], type=pa.uint32()),
-            pa.array([r[4] for r in overlap_rows], type=pa.uint8()),
-        ], schema=ov_schema)
-    ]) if overlap_rows else pa.Table.from_batches([], schema=ov_schema)
-
-    pq.write_table(ov_table, out_p / "gene_overlaps.parquet", compression="ZSTD")
-    print(f"Created gene_overlaps.parquet with {len(overlap_rows)} overlapping gene pairs.")
+    sp_df.write_parquet(out_p / "gene_spacing.parquet", compression="zstd")
+    ov_df.write_parquet(out_p / "gene_overlaps.parquet", compression="zstd")
+    print(f"Created gene_spacing.parquet with {sp_df.height} consecutive gene pairs.")
+    print(f"Created gene_overlaps.parquet with {ov_df.height} overlapping gene pairs.")
 
 if __name__ == "__main__":
     args = parse_args()

@@ -13,4 +13,5 @@ dependencies:
   - pyarrow>=14.0
   - duckdb>=0.9
   - pandas>=2.1
+  - polars>=1.0
   - pyyaml>=6.0

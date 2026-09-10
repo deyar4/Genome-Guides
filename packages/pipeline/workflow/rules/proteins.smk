@@ -5,7 +5,10 @@ rule parse_protein_census:
         faa="data/raw/{genome}_protein.faa.gz"
     output:
         aa_comp="data/tracks/{genome}/all/amino_acid_composition.parquet",
-        homo_tracts="data/tracks/{genome}/all/protein_homopolymers.parquet"
+        homo_tracts="data/tracks/{genome}/all/protein_homopolymers.parquet",
+        lengths="data/tracks/{genome}/all/protein_lengths.parquet",
+        composition="data/tracks/{genome}/all/protein_composition.parquet",
+        richness="data/tracks/{genome}/all/protein_richness.parquet"
     shell:
         """
         python3 packages/pipeline/scripts/proteins/parse_proteins_to_parquet.py \

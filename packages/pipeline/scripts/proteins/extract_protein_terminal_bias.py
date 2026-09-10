@@ -2,15 +2,14 @@
 """
 Genome Guides - Protein Terminal Bias Extractor
 Analyzes N-terminal (first 20 AA) vs C-terminal (last 20 AA) amino acid composition bias.
+Optimized version using fast C-level str.count calls.
 """
 
 import sys
 import argparse
 import gzip
 from pathlib import Path
-from collections import Counter
-import pyarrow as pa
-import pyarrow.parquet as pq
+import polars as pl
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -24,8 +23,8 @@ def analyze_terminal_bias(input_path: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    n_term_counts = Counter()
-    c_term_counts = Counter()
+    n_term_counts = {aa: 0 for aa in AMINO_ACIDS}
+    c_term_counts = {aa: 0 for aa in AMINO_ACIDS}
 
     open_fn = gzip.open if input_path.endswith(".gz") else open
 
@@ -34,8 +33,11 @@ def analyze_terminal_bias(input_path: str, out_dir: str):
 
     def process_sequence(seq):
         if len(seq) >= 40:
-            n_term_counts.update(seq[:20])
-            c_term_counts.update(seq[-20:])
+            n_seq = seq[:20]
+            c_seq = seq[-20:]
+            for aa in AMINO_ACIDS:
+                n_term_counts[aa] += n_seq.count(aa)
+                c_term_counts[aa] += c_seq.count(aa)
 
     with open_fn(input_path, "rt") as f:
         for line in f:
@@ -62,27 +64,17 @@ def analyze_terminal_bias(input_path: str, out_dir: str):
         bias_ratio = float(n_pct / c_pct) if c_pct > 0 else 0.0
         rows.append((aa, n_term_counts[aa], float(n_pct), c_term_counts[aa], float(c_pct), float(bias_ratio)))
 
-    schema = pa.schema([
-        ("amino_acid", pa.string()),
-        ("n_terminal_count", pa.uint64()),
-        ("n_terminal_pct", pa.float32()),
-        ("c_terminal_count", pa.uint64()),
-        ("c_terminal_pct", pa.float32()),
-        ("n_to_c_bias_ratio", pa.float32())
-    ])
+    schema = {
+        "amino_acid": pl.Utf8,
+        "n_terminal_count": pl.UInt64,
+        "n_terminal_pct": pl.Float32,
+        "c_terminal_count": pl.UInt64,
+        "c_terminal_pct": pl.Float32,
+        "n_to_c_bias_ratio": pl.Float32
+    }
 
-    table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in rows], type=pa.string()),
-            pa.array([r[1] for r in rows], type=pa.uint64()),
-            pa.array([r[2] for r in rows], type=pa.float32()),
-            pa.array([r[3] for r in rows], type=pa.uint64()),
-            pa.array([r[4] for r in rows], type=pa.float32()),
-            pa.array([r[5] for r in rows], type=pa.float32()),
-        ], schema=schema)
-    ])
-
-    pq.write_table(table, out_p / "protein_terminal_bias.parquet", compression="ZSTD")
+    df = pl.DataFrame(rows, schema=schema, orient="row")
+    df.write_parquet(out_p / "protein_terminal_bias.parquet", compression="zstd")
     print(f"Created protein_terminal_bias.parquet with {len(rows)} amino acids.")
 
 if __name__ == "__main__":

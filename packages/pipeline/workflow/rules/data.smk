@@ -33,6 +33,28 @@ rule download_t2t_gff:
         curl -sSL {params.url} -o {output.gff}
         """
 
+rule download_t2t_centromeres:
+    output:
+        bed="data/raw/t2t_centromeres.bed"
+    params:
+        url="https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_GenomeFeature_v1.0.bed"
+    shell:
+        """
+        mkdir -p data/raw
+        curl --fail --location --retry 3 -sS {params.url} -o {output.bed}
+        """
+
+rule download_t2t_telomeres:
+    output:
+        bed="data/raw/t2t_telomeres.bed"
+    params:
+        url="https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_telomere.bed"
+    shell:
+        """
+        mkdir -p data/raw
+        curl --fail --location --retry 3 -sS {params.url} -o {output.bed}
+        """
+
 rule download_t2t_protein:
     output:
         faa="data/raw/t2t_protein.faa.gz"

@@ -8,27 +8,35 @@ include: "rules/trivial_cli.smk"
 include: "rules/dna.smk"
 include: "rules/genes.smk"
 include: "rules/proteins.smk"
-include: "rules/hecate.smk"
 
 rule all:
     input:
         "data/raw/tiny.fa.fai",
         "data/tracks/tiny/all/gc_content.parquet",
         "data/tracks/tiny/all/assembly_gaps.parquet",
-        "data/tracks/tiny/all/sequence_stats.txt"
+        "data/tracks/tiny/all/homopolymer_genomic_tracts.parquet",
+        "data/tracks/tiny/all/sequence_stats.txt",
+        "data/tracks/tiny/all/hecate_mprob.parquet"
 
 rule chrm_all:
     input:
         "data/raw/chrm.fa.fai",
         "data/tracks/chrm/all/gc_content.parquet",
         "data/tracks/chrm/all/assembly_gaps.parquet",
-        "data/tracks/chrm/all/sequence_stats.txt"
+        "data/tracks/chrm/all/homopolymer_genomic_tracts.parquet",
+        "data/tracks/chrm/all/sequence_stats.txt",
+        "data/tracks/chrm/all/hecate_mprob.parquet"
 
 rule t2t_all:
     input:
         "data/raw/t2t.fa.fai",
         "data/tracks/t2t/all/gc_content.parquet",
+        "data/tracks/t2t/all/isochores.parquet",
         "data/tracks/t2t/all/assembly_gaps.parquet",
+        "data/tracks/t2t/all/ssr_hits.parquet",
+        "data/tracks/t2t/all/ssr_summary.parquet",
+        "data/tracks/t2t/all/ssr_density.parquet",
+        "data/tracks/t2t/all/ssr_enrichment.parquet",
         "data/tracks/t2t/all/cpg_islands.parquet",
         "data/tracks/t2t/all/kmers_3mer.parquet",
         "data/tracks/t2t/all/kmers_6mer.parquet",
@@ -36,6 +44,11 @@ rule t2t_all:
         "data/tracks/t2t/all/dinucleotide_frequencies.parquet",
         "data/tracks/t2t/all/homopolymer_genomic_tracts.parquet",
         "data/tracks/t2t/all/gene_models.parquet",
+        "data/tracks/t2t/all/transcripts.parquet",
+        "data/tracks/t2t/all/exons.parquet",
+        "data/tracks/t2t/all/introns.parquet",
+        "data/tracks/t2t/all/utrs.parquet",
+        "data/tracks/t2t/all/gene_architecture.parquet",
         "data/tracks/t2t/all/gene_density.parquet",
         "data/tracks/t2t/all/gene_biotype_census.parquet",
         "data/tracks/t2t/all/gene_spacing.parquet",
@@ -44,7 +57,17 @@ rule t2t_all:
         "data/tracks/t2t/all/repeatmasker_density.parquet",
         "data/tracks/t2t/all/ncrna_detailed_census.parquet",
         "data/tracks/t2t/all/gene_isoform_counts.parquet",
+        "data/tracks/t2t/all/splice_sites.parquet",
+        "data/tracks/t2t/all/splice_site_consensus.parquet",
+        "data/tracks/t2t/all/rna_clusters.parquet",
+        "data/tracks/t2t/all/rna_cluster_summary.parquet",
         "data/tracks/t2t/all/amino_acid_composition.parquet",
         "data/tracks/t2t/all/protein_homopolymers.parquet",
+        "data/tracks/t2t/all/protein_lengths.parquet",
+        "data/tracks/t2t/all/protein_composition.parquet",
+        "data/tracks/t2t/all/protein_richness.parquet",
         "data/tracks/t2t/all/protein_terminal_bias.parquet",
-        "data/tracks/t2t/all/sequence_stats.txt"
+        "data/tracks/t2t/all/centromeres.parquet",
+        "data/tracks/t2t/all/telomeres.parquet",
+        "data/tracks/t2t/all/sequence_stats.txt",
+        "data/tracks/t2t/all/hecate_mprob.parquet"

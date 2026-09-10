@@ -2,6 +2,7 @@
 """
 Genome Guides - Fast Protein FASTA Census & Homopolymer Analyzer
 Parses protein FASTA files into Parquet files for Amino Acid Composition and Homopolymer Repeats.
+Optimized version using fast C-level str.count calls and optimized regex.
 """
 
 import sys
@@ -9,9 +10,8 @@ import argparse
 import gzip
 import re
 from pathlib import Path
-from collections import Counter
-import pyarrow as pa
-import pyarrow.parquet as pq
+import polars as pl
+import math
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -25,10 +25,12 @@ def analyze_proteins(input_path: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    total_aa_counts = Counter()
-    protein_entries = []
+    total_aa_counts = {aa: 0 for aa in AMINO_ACIDS}
     homopolymers = []
-    homo_regex = re.compile(r'([A-Z])\1{4,}')
+    lengths = []
+    per_protein_composition = []
+    richness = []
+    homo_regex = re.compile(r'([ACDEFGHIKLMNPQRSTVWY])\1{4,}')
 
     open_fn = gzip.open if input_path.endswith(".gz") else open
 
@@ -37,9 +39,24 @@ def analyze_proteins(input_path: str, out_dir: str):
 
     def process_protein_record(protein_id, sequence):
         length = len(sequence)
-        counts = Counter(sequence)
-        total_aa_counts.update(counts)
-        protein_entries.append((protein_id, length))
+        lengths.append((protein_id, length))
+        counts = {aa: sequence.count(aa) for aa in AMINO_ACIDS}
+        entropy = 0.0
+        for count in counts.values():
+            if count:
+                p = count / max(1, length)
+                entropy -= p * math.log2(p)
+        distinct = sum(1 for count in counts.values() if count)
+        dominant = max(counts, key=counts.get) if length else ""
+        richness.append((protein_id, length, distinct, dominant,
+                         float(max(counts.values(), default=0) / max(1, length) * 100.0),
+                         float(entropy)))
+        for aa, count in counts.items():
+            per_protein_composition.append(
+                (protein_id, aa, count, float(count / max(1, length) * 100.0))
+            )
+        for aa in AMINO_ACIDS:
+            total_aa_counts[aa] += counts[aa]
 
         for m in homo_regex.finditer(sequence):
             aa = m.group(1)
@@ -66,11 +83,11 @@ def analyze_proteins(input_path: str, out_dir: str):
             process_protein_record(current_id, full_seq)
 
     # 1. Write Amino Acid Composition Parquet
-    aa_schema = pa.schema([
-        ("amino_acid", pa.string()),
-        ("count", pa.uint64()),
-        ("frequency_pct", pa.float32())
-    ])
+    aa_schema = {
+        "amino_acid": pl.Utf8,
+        "count": pl.UInt64,
+        "frequency_pct": pl.Float32
+    }
 
     total_aa = sum(total_aa_counts.values()) or 1
     aa_rows = [
@@ -78,40 +95,45 @@ def analyze_proteins(input_path: str, out_dir: str):
         for aa in AMINO_ACIDS
     ]
 
-    aa_table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in aa_rows], type=pa.string()),
-            pa.array([r[1] for r in aa_rows], type=pa.uint64()),
-            pa.array([r[2] for r in aa_rows], type=pa.float32()),
-        ], schema=aa_schema)
-    ])
-    pq.write_table(aa_table, out_p / "amino_acid_composition.parquet", compression="ZSTD")
+    aa_df = pl.DataFrame(aa_rows, schema=aa_schema, orient="row")
+    aa_df.write_parquet(out_p / "amino_acid_composition.parquet", compression="zstd")
     print(f"Created amino_acid_composition.parquet with {len(aa_rows)} amino acids.")
 
     # 2. Write Homopolymers Parquet
-    homo_schema = pa.schema([
-        ("protein_id", pa.string()),
-        ("amino_acid", pa.string()),
-        ("repeat_len", pa.uint32()),
-        ("start_pos", pa.uint32()),
-        ("end_pos", pa.uint32())
-    ])
+    homo_schema = {
+        "protein_id": pl.Utf8,
+        "amino_acid": pl.Utf8,
+        "repeat_len": pl.UInt32,
+        "start_pos": pl.UInt32,
+        "end_pos": pl.UInt32
+    }
 
     if homopolymers:
-        homo_table = pa.Table.from_batches([
-            pa.RecordBatch.from_arrays([
-                pa.array([r[0] for r in homopolymers], type=pa.string()),
-                pa.array([r[1] for r in homopolymers], type=pa.string()),
-                pa.array([r[2] for r in homopolymers], type=pa.uint32()),
-                pa.array([r[3] for r in homopolymers], type=pa.uint32()),
-                pa.array([r[4] for r in homopolymers], type=pa.uint32()),
-            ], schema=homo_schema)
-        ])
+        homo_df = pl.DataFrame(homopolymers, schema=homo_schema, orient="row")
     else:
-        homo_table = pa.Table.from_batches([], schema=homo_schema)
+        homo_df = pl.DataFrame(schema=homo_schema)
 
-    pq.write_table(homo_table, out_p / "protein_homopolymers.parquet", compression="ZSTD")
+    homo_df.write_parquet(out_p / "protein_homopolymers.parquet", compression="zstd")
     print(f"Created protein_homopolymers.parquet with {len(homopolymers)} repeat tracts.")
+
+    length_df = pl.DataFrame(lengths, schema={
+        "protein_id": pl.Utf8, "length": pl.UInt32
+    }, orient="row")
+    length_df.write_parquet(out_p / "protein_lengths.parquet", compression="zstd")
+
+    composition_df = pl.DataFrame(per_protein_composition, schema={
+        "protein_id": pl.Utf8, "amino_acid": pl.Utf8,
+        "count": pl.UInt32, "frequency_pct": pl.Float32
+    }, orient="row")
+    composition_df.write_parquet(out_p / "protein_composition.parquet", compression="zstd")
+
+    richness_df = pl.DataFrame(richness, schema={
+        "protein_id": pl.Utf8, "length": pl.UInt32, "distinct_amino_acids": pl.UInt8,
+        "dominant_amino_acid": pl.Utf8, "dominant_frequency_pct": pl.Float32,
+        "shannon_entropy": pl.Float32
+    }, orient="row")
+    richness_df.write_parquet(out_p / "protein_richness.parquet", compression="zstd")
+    print(f"Created protein_lengths.parquet for {len(lengths)} proteins.")
 
 if __name__ == "__main__":
     args = parse_args()

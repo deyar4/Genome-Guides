@@ -21,10 +21,8 @@ rule compute_gc_and_skew:
         step=1000
     shell:
         """
-        python3 packages/pipeline/scripts/dna/extract_gc_skew.py \
-            -f {input.fasta} \
-            -o {output.tsv} \
-            -w {params.window} -s {params.step}
+        seqkit sliding -g -W {params.window} -s {params.step} {input.fasta} | \
+        seqkit fx2tab -n -g -G -C A,C,G,T,N -B A,C,G,T,N -H > {output.tsv}
         """
 
 rule extract_assembly_gaps:
@@ -32,12 +30,10 @@ rule extract_assembly_gaps:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        tsv="data/interim/{genome}/assembly_gaps.tsv"
+        bed="data/interim/{genome}/assembly_gaps.bed"
     shell:
         """
-        python3 packages/pipeline/scripts/dna/extract_assembly_gaps.py \
-            -f {input.fasta} \
-            -o {output.tsv}
+        seqkit locate -i -r -P -p '"N+"' --bed {input.fasta} > {output.bed}
         """
 
 rule convert_gc_skew_to_parquet:
@@ -55,13 +51,13 @@ rule convert_gc_skew_to_parquet:
 
 rule convert_gaps_to_parquet:
     input:
-        tsv="data/interim/{genome}/assembly_gaps.tsv"
+        bed="data/interim/{genome}/assembly_gaps.bed"
     output:
         parquet="data/tracks/{genome}/all/assembly_gaps.parquet"
     shell:
         """
         python3 packages/pipeline/scripts/common/tsv_to_parquet.py \
-            -i {input.tsv} \
+            -i {input.bed} \
             -o {output.parquet} \
             -s assembly_gaps
         """

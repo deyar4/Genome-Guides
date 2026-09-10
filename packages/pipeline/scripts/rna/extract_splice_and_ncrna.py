@@ -2,15 +2,21 @@
 """
 Genome Guides - Splice Site Consensus & Detailed ncRNA Sub-Class Extractor
 Parses GTF annotations and sequence fasta to build Splice Site Dinucleotide Consensus and ncRNA Sub-Class Census.
+Optimized version using regex for fast attribute extraction.
 """
 
 import sys
 import argparse
 import gzip
+import re
 from pathlib import Path
 from collections import defaultdict, Counter
-import pyarrow as pa
-import pyarrow.parquet as pq
+import polars as pl
+
+# Precompiled regex for rapid extraction of key GTF/GFF attributes
+ATTR_RE = re.compile(
+    r'(gene_name|Name|gene_id|ID|transcript_id|gene_biotype|gene_type|gbkey|exon_id)[ \t]*[= ][ \t]*"?([^";]+)"?'
+)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract Splice Site Consensus & Detailed ncRNA Census.")
@@ -18,21 +24,8 @@ def parse_args():
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory")
     return parser.parse_args()
 
-def parse_attributes(attr_str):
-    attrs = {}
-    for item in attr_str.strip().split(";"):
-        item = item.strip()
-        if not item:
-            continue
-        if "=" in item:
-            k, v = item.split("=", 1)
-            attrs[k.strip()] = v.strip().strip('"')
-        else:
-            parts = item.split(None, 1)
-            if len(parts) == 2:
-                k, v = parts[0], parts[1].strip('"')
-                attrs[k.strip()] = v.strip().strip('"')
-    return attrs
+def parse_attributes_fast(attr_str):
+    return {m[0]: m[1].strip() for m in ATTR_RE.findall(attr_str)}
 
 def run_extractor(gtf_path: str, out_dir: str):
     out_p = Path(out_dir)
@@ -52,22 +45,21 @@ def run_extractor(gtf_path: str, out_dir: str):
             if len(parts) < 9:
                 continue
 
-            contig, source, feature_type, start_str, end_str, score, strand, phase, attr_str = parts
+            contig, _, feature_type, start_str, end_str, _, strand, _, attr_str = parts
             try:
                 start = int(start_str) - 1
                 end = int(end_str)
             except ValueError:
                 continue
 
-            attrs = parse_attributes(attr_str)
+            attrs = parse_attributes_fast(attr_str)
             gene_name = attrs.get("gene_name") or attrs.get("gene_id") or "UNKNOWN"
             transcript_id = attrs.get("transcript_id", "")
 
-            if feature_type in ["transcript", "gene", "mRNA", "lnc_RNA", "ncRNA_gene"]:
+            if feature_type in ("transcript", "gene", "mRNA", "lnc_RNA", "ncRNA_gene"):
                 if gene_name:
                     isoform_counts[gene_name] += 1
 
-                transcript_id = attrs.get("transcript_id", "")
                 if transcript_id.startswith("NR_") or transcript_id.startswith("XR_"):
                     if "tRNA" in gene_name or "tRNA" in attr_str:
                         subclass = "tRNA"
@@ -87,37 +79,33 @@ def run_extractor(gtf_path: str, out_dir: str):
                 exons_by_transcript[transcript_id].append((contig, start, end, strand))
 
     # 1. Write Detailed ncRNA Census Parquet
-    ncrna_schema = pa.schema([
-        ("ncrna_subclass", pa.string()),
-        ("count", pa.uint32())
-    ])
+    ncrna_schema = {
+        "ncrna_subclass": pl.Utf8,
+        "count": pl.UInt32
+    }
 
     nc_rows = list(ncrna_subclasses.items())
-    nc_table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in nc_rows], type=pa.string()),
-            pa.array([r[1] for r in nc_rows], type=pa.uint32()),
-        ], schema=ncrna_schema)
-    ]) if nc_rows else pa.Table.from_batches([], schema=ncrna_schema)
+    if nc_rows:
+        nc_df = pl.DataFrame(nc_rows, schema=ncrna_schema, orient="row")
+    else:
+        nc_df = pl.DataFrame(schema=ncrna_schema)
 
-    pq.write_table(nc_table, out_p / "ncrna_detailed_census.parquet", compression="ZSTD")
+    nc_df.write_parquet(out_p / "ncrna_detailed_census.parquet", compression="zstd")
     print(f"Created ncrna_detailed_census.parquet with {len(nc_rows)} ncRNA subclasses.")
 
     # 2. Write Gene Isoform Counts Parquet
-    iso_schema = pa.schema([
-        ("gene_name", pa.string()),
-        ("isoform_count", pa.uint32())
-    ])
+    iso_schema = {
+        "gene_name": pl.Utf8,
+        "isoform_count": pl.UInt32
+    }
 
     iso_rows = list(isoform_counts.items())
-    iso_table = pa.Table.from_batches([
-        pa.RecordBatch.from_arrays([
-            pa.array([r[0] for r in iso_rows], type=pa.string()),
-            pa.array([r[1] for r in iso_rows], type=pa.uint32()),
-        ], schema=iso_schema)
-    ]) if iso_rows else pa.Table.from_batches([], schema=iso_schema)
+    if iso_rows:
+        iso_df = pl.DataFrame(iso_rows, schema=iso_schema, orient="row")
+    else:
+        iso_df = pl.DataFrame(schema=iso_schema)
 
-    pq.write_table(iso_table, out_p / "gene_isoform_counts.parquet", compression="ZSTD")
+    iso_df.write_parquet(out_p / "gene_isoform_counts.parquet", compression="zstd")
     print(f"Created gene_isoform_counts.parquet for {len(iso_rows)} genes.")
 
 if __name__ == "__main__":

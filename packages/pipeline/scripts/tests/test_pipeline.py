@@ -6,7 +6,7 @@ Genome Guides - Pipeline Integration Test & Synthetic Data Generator
 import sys
 import subprocess
 from pathlib import Path
-import pyarrow.parquet as pq
+import polars as pl
 
 def run_test():
     raw_dir = Path("data/raw")
@@ -16,14 +16,9 @@ def run_test():
     with open(tiny_fa, "w") as f:
         f.write(">chr1\nATGCATGCATGCATGCATGCATGCATGCATGCATGCATGC\n")
 
-    # Run GC skew
-    cmd_gc = [
-        "python3", "packages/pipeline/scripts/dna/extract_gc_skew.py",
-        "-f", str(tiny_fa),
-        "-o", "data/interim/tiny/gc_skew.tsv",
-        "-w", "10", "-s", "10"
-    ]
-    subprocess.run(cmd_gc, check=True)
+    # Run GC skew via seqkit sliding & fx2tab
+    cmd_gc = f"seqkit sliding -g -W 10 -s 10 {tiny_fa} | seqkit fx2tab -n -g -G -H > data/interim/tiny/gc_skew.tsv"
+    subprocess.run(cmd_gc, shell=True, check=True)
 
     # Convert to Parquet
     cmd_pq = [
@@ -35,8 +30,8 @@ def run_test():
     subprocess.run(cmd_pq, check=True)
 
     # Verify Parquet
-    tbl = pq.read_table("data/tracks/tiny/all/gc_content.parquet")
-    assert tbl.num_rows > 0, "Test Parquet track is empty!"
+    df = pl.read_parquet("data/tracks/tiny/all/gc_content.parquet")
+    assert df.height > 0, "Test Parquet track is empty!"
     print(f"Created synthetic test FASTA at: {tiny_fa}")
     print(f"Successfully generated Parquet test track at: data/tracks/tiny/all/gc_content.parquet")
 
