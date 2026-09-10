@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Genome Guides FastAPI Engine & Track Query Service"
+description = "Genome Guides FastAPI Backend"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
