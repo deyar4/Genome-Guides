@@ -1,0 +1,398 @@
+export interface AssemblyStats {
+  total_length: number;
+  contig_count: number;
+  n50: number;
+  l50: number;
+  n90?: number;
+  l90?: number;
+  min_len?: number;
+  max_len?: number;
+  mean_length?: number;
+  median_length?: number;
+  gc_content: number | null;
+}
+
+export interface GenomeSection {
+  a: number;
+  c: number;
+  g: number;
+  t: number;
+  n: number;
+  gc_content: number;
+}
+
+export interface DNAStats {
+  assembly: AssemblyStats;
+  nuclear_composition: GenomeSection;
+  mitochondrial_composition: GenomeSection | null;
+  gene_count?: number;
+  protein_coding_count?: number;
+}
+
+export interface Chromosome {
+  name: string;
+  length: number;
+  gc_content: number;
+  gc_skew: number;
+  is_mitochondrial: boolean;
+  ssr_count: number;
+  dinucleotides: Record<string, number>;
+}
+
+export interface ChromosomeListResponse {
+  count: number;
+  chromosomes: Chromosome[];
+}
+
+export interface DinucleotideStats {
+  pair: string;
+  observed_count: number;
+  observed_freq: number;
+  expected_freq: number;
+  oe_ratio: number;
+}
+
+export interface GenomeDinucleotides {
+  total_dinucleotides: number;
+  base_frequencies: Record<string, number>;
+  dinucleotides: DinucleotideStats[];
+}
+
+export interface SSRSummary {
+  period: number;
+  name: string;
+  count: number;
+  total_length: number;
+  avg_repeat_count: number;
+}
+
+export interface SSRDensityWindow {
+  chrom: string;
+  start: number;
+  end: number;
+  count: number;
+}
+
+export interface SSRHit {
+  chrom: string;
+  start: number;
+  end: number;
+  motif: string;
+  period: number;
+  repeat_count: number;
+  sequence: string;
+  length: number;
+  period_name: string;
+  complexity: number;
+}
+
+export interface TelomereHit {
+  chrom: string;
+  position: number;
+  end: number;
+  strand: string;
+  repeat_count: number;
+  sequence: string;
+  location: string;
+  length: number;
+}
+
+export interface CentromereRegion {
+  chrom: string;
+  start: number;
+  end: number;
+  length: number;
+  gc_content: number | null;
+  sequence_sample: string | null;
+}
+
+export interface IsochoreStats {
+  chrom: string;
+  start: number;
+  end: number;
+  gc_content: number;
+  isochore_class: string;
+}
+
+export interface CpGIslandHit {
+  chrom: string;
+  start: number;
+  end: number;
+  length: number;
+  gc_content: number;
+  obs_exp_ratio: number;
+}
+
+export interface AssemblyGapHit {
+  chrom: string;
+  start: number;
+  end: number;
+  length: number;
+  gap_type: string;
+}
+
+export interface Exon {
+  exon_number: string;
+  start: number;
+  end: number;
+  strand: string;
+  transcript_id: string;
+}
+
+export interface Transcript {
+  transcript_id: string;
+  gene_id: string;
+  biotype: string | null;
+  start: number;
+  end: number;
+  strand: string;
+  exons: Exon[];
+}
+
+export interface Gene {
+  gene_id: string;
+  gene_name: string | null;
+  biotype: string | null;
+  chrom: string;
+  start: number;
+  end: number;
+  strand: string;
+  transcripts: Transcript[];
+}
+
+export interface BiotypeStat {
+  biotype: string;
+  count: number;
+}
+
+export interface GeneSummary {
+  total_genes: number;
+  biotype_counts: BiotypeStat[];
+  avg_exons_per_transcript: number;
+}
+
+export interface TopGene {
+  gene_id: string;
+  gene_name: string | null;
+  biotype: string | null;
+  chrom: string;
+  value: number;
+  secondary_value: number | null;
+  rank: number;
+  start: number | null;
+  end: number | null;
+  strand: string | null;
+}
+
+export interface GeneSearchResponse {
+  gene_id: string;
+  gene_name: string | null;
+  biotype: string | null;
+  chrom: string;
+  start?: number;
+  end?: number;
+}
+
+export interface GeneChromosomeStat {
+  chrom: string;
+  gene_count: number;
+  density: number;
+}
+
+export interface IntergenicSpacing {
+  chrom: string;
+  gene_id_1: string;
+  gene_id_2: string;
+  start: number;
+  end: number;
+  distance: number;
+}
+
+export interface GeneOverlap {
+  chrom: string;
+  gene_id_1: string;
+  gene_id_2: string;
+  overlap_type: string;
+}
+
+export interface NestedGenePair {
+  host_gene_id: string;
+  host_gene_name: string | null;
+  host_biotype: string | null;
+  guest_gene_id: string;
+  guest_gene_name: string | null;
+  guest_biotype: string | null;
+  chrom: string;
+  guest_start: number;
+  guest_end: number;
+  strand_relation: string;
+}
+
+export interface NestedGeneSummary {
+  total_pairs: number;
+  same_strand: number;
+  opposite_strand: number;
+  sample: NestedGenePair[];
+}
+
+export interface CorrelationResult {
+  r_value: number;
+  p_value: number | null;
+  n: number;
+  interpretation: string;
+  sample: number[][];
+}
+
+export interface UTRCorrelation {
+  utr_5prime_correlation: CorrelationResult;
+  utr_3prime_correlation: CorrelationResult;
+}
+
+export interface CpGAssociation {
+  with_cpg: number;
+  without_cpg: number;
+  total: number;
+  percentage: number;
+  by_biotype: Record<string, { with_cpg: number, without_cpg: number, percentage: number }>;
+  note: string | null;
+}
+
+// --- RNA Module ---
+
+export interface RNACluster {
+  cluster_id: string;
+  rna_type: string;
+  chrom: string;
+  start: number;
+  end: number;
+  size: number;
+  genes: string[];
+}
+
+export interface RNAClusterSummary {
+  rna_type: string;
+  num_clusters: number;
+  avg_cluster_size: number;
+  max_cluster_size: number;
+  largest_cluster_location: string;
+}
+
+export interface RNASummary {
+  overall_stats: {
+    biotype_counts: Record<string, number>;
+    cluster_counts: Record<string, number>;
+    total_nc_rna: number;
+    total_clusters: number;
+  };
+  cluster_summaries: RNAClusterSummary[];
+}
+
+export interface HostGuestRelationship {
+  host_gene_id: string;
+  host_gene_name: string | null;
+  guest_gene_id: string;
+  guest_gene_name: string | null;
+  guest_biotype: string;
+  relationship_type: string;
+  is_same_strand: boolean;
+}
+
+export interface SpliceSiteConsensus {
+  site_type: string;
+  consensus_seq: string;
+  pwm: Record<string, number[]>;
+  total_sites: number;
+}
+
+export interface RNAEditingSite {
+  gene_id: string;
+  chrom: string;
+  position: number;
+  ref: string;
+  alt: string;
+  frequency: number | null;
+  site_type: string;
+}
+
+// --- Protein Module ---
+
+export interface ProteinStats {
+  total_proteins: number;
+  avg_length: number;
+  median_length: number;
+  max_length: number;
+  min_length: number;
+}
+
+export interface AminoAcidComposition {
+  amino_acid: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ProteinBase {
+  protein_id: string;
+  gene_id: string;
+  gene_name: string | null;
+  transcript_id: string;
+  sequence: string;
+  length: number;
+  is_mitochondrial: boolean;
+}
+
+export interface HomopolymerTract {
+  amino_acid: string;
+  start: number;
+  end: number;
+  length: number;
+  protein_id?: string; // Added for context in some views
+}
+
+export interface ProteinRichness {
+  protein_id: string;
+  amino_acid: string;
+  percentage: number;
+  z_score: number;
+}
+
+// --- System Module ---
+
+export interface SystemJob {
+  job_id: number;
+  type: string;
+  status: string;
+  progress: number;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface BuildResponse {
+  message: string;
+  job_id: number;
+  status: string;
+}
+
+export interface SystemHealth {
+  status: string;
+  version: string;
+}
+
+export interface SystemReady {
+  status: string;
+  components: Record<string, string>;
+}
+
+export interface KmerFrequency {
+  kmer: string;
+  count: number;
+  frequency: number;
+}
+
+export interface KmerResponse {
+  k: number;
+  total_kmers: number;
+  unique_kmers: number;
+  kmers: KmerFrequency[];
+}
