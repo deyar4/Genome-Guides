@@ -25,11 +25,15 @@ build/
 dist/
 
 # Python Environments & Cache
-.venv
+.venv/
 .pytest_cache/
 .coverage
 htmlcov/
 *.log
+
+# Local analysis and generated reports
+artifacts/
+analysis/results/
 
 # Operating System
 .DS_Store
@@ -38,3 +42,5 @@ Thumbs.db
 # Snakemake cache
 .snakemake/
 
+# Rust build output
+target/

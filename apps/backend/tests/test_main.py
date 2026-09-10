@@ -1,8 +1,10 @@
 import pytest
+from pathlib import Path
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
+DATA_DIR = Path(__file__).parents[3] / "data"
 
 def test_health_check():
     response = client.get("/api/health")
@@ -19,6 +21,9 @@ def test_get_track_data_not_found():
     assert "not found" in response.json()["detail"].lower()
 
 def test_get_track_data_success():
+    if not (DATA_DIR / "tracks" / "tiny" / "all" / "gc_content.parquet").exists():
+        pytest.skip("generated pipeline fixtures are not available")
+
     # Query the synthetic track generated for test_pipeline
     response = client.get(
         "/api/tracks/tiny/chr1/gc_content",
@@ -31,3 +36,8 @@ def test_get_track_data_success():
     assert res_data["track_name"] == "gc_content"
     assert len(res_data["data"]) > 0
     assert "avg_value" in res_data["data"][0]
+
+def test_get_global_summary_not_found():
+    response = client.get("/api/summary/nonexistent_genome/amino_acid_composition")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
