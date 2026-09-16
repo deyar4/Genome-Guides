@@ -62,6 +62,11 @@ export default function SSRAnalysisPage() {
     queryFn: () => dnaApi.getSSRDensity(activeGenome, selectedChrom, 1000000), // 1Mb bins
     enabled: !!selectedChrom
   });
+  const { data: enrichment = [], isLoading: enrichmentLoading } = useQuery({
+    queryKey: ['ssr-enrichment', activeGenome, selectedChrom],
+    queryFn: () => dnaApi.getSSREnrichment(activeGenome, selectedChrom, 10),
+    enabled: !!selectedChrom,
+  });
 
   const topHits = useMemo(() => hits || [], [hits]);
 
@@ -238,6 +243,27 @@ export default function SSRAnalysisPage() {
               </div>
            </Card>
         </div>
+
+        <Card className="p-8 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest">Enriched motifs</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Most frequent repeat motifs from the selected chromosome.</p>
+            </div>
+            <MapPin className="h-4 w-4 text-primary" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
+            {enrichment.map((item) => (
+              <div key={item.motif} className="rounded-xl border border-border bg-muted/30 p-3 text-center">
+                <div className="font-mono text-sm font-bold text-primary">{item.motif}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground">{formatNumber(item.count)} hits</div>
+              </div>
+            ))}
+          </div>
+          {!enrichmentLoading && enrichment.length === 0 && (
+            <p className="text-sm text-muted-foreground">No motif enrichment data is available for this chromosome.</p>
+          )}
+        </Card>
 
         {/* LEADBOARD TABLE */}
         <section>

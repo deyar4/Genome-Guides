@@ -314,6 +314,19 @@ export interface RNAEditingSite {
   site_type: string;
 }
 
+export interface SpliceSiteRecord {
+  chrom: string;
+  start: number;
+  end: number;
+  transcript_id: string;
+  gene_id: string;
+  strand: string;
+  junction_number: number;
+  donor_seq: string | null;
+  acceptor_seq: string | null;
+  is_canonical: boolean;
+}
+
 // --- Protein Module ---
 
 export interface ProteinStats {
@@ -382,6 +395,13 @@ export interface SystemHealth {
 export interface SystemReady {
   status: string;
   components: Record<string, string>;
+}
+
+export interface TrackDataResponse<T = Record<string, unknown>> {
+  genome: string;
+  contig: string;
+  track_name: string;
+  data: T[];
 }
 
 export interface KmerFrequency {

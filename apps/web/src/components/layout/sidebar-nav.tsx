@@ -12,7 +12,8 @@ import {
   Database,
   Info,
   BookOpen,
-  Map
+  Map,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -89,17 +90,27 @@ const navigation: NavSection[] = [
   }
 ];
 
-export function SidebarNav({ className }: { className?: string }) {
+export function SidebarNav({ className, mobileOpen = false, onClose }: { className?: string; mobileOpen?: boolean; onClose?: () => void }) {
   const pathname = usePathname();
   const { activeGenome, setActiveGenome, availableGenomes } = useGenomeStore();
 
   return (
-    <nav className={cn("flex flex-col h-full bg-card/80 border-r border-border w-64 backdrop-blur-xl", className)}>
+    <nav className={cn(
+      "flex flex-col h-full bg-card/95 border-r border-border w-72 backdrop-blur-xl",
+      "fixed inset-y-0 left-0 z-40 transition-transform duration-300 lg:static lg:translate-x-0",
+      mobileOpen ? "translate-x-0" : "-translate-x-full",
+      className
+    )}>
       <div className="p-6 border-b border-border">
-        <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2 mb-6">
-          <Map className="h-6 w-6 text-primary" />
-          Genome Guides
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <Map className="h-6 w-6 text-primary" />
+            Genome Guides
+          </h1>
+          <button className="lg:hidden rounded-lg p-2 text-muted-foreground hover:bg-accent" onClick={onClose} aria-label="Close navigation">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
         <div className="space-y-1.5">
           <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">
@@ -132,6 +143,7 @@ export function SidebarNav({ className }: { className?: string }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={onClose}
                   className={cn(
                     "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                     isActive 

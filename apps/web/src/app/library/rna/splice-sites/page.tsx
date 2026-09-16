@@ -20,6 +20,10 @@ export default function SpliceSitesPage() {
     queryKey: ['rna-splice-consensus', activeGenome, siteType],
     queryFn: () => rnaApi.getSpliceConsensus(activeGenome, siteType),
   });
+  const { data: spliceRecords = [], isLoading: recordsLoading } = useQuery({
+    queryKey: ['rna-splice-records', activeGenome, siteType],
+    queryFn: () => rnaApi.getSpliceRecords(activeGenome, { site_type: siteType, limit: 12 }),
+  });
 
   const consensus = consensusList?.[0];
 
@@ -181,6 +185,43 @@ export default function SpliceSitesPage() {
                  <span className="text-[10px] font-bold text-slate-400 uppercase">Cleavage Point</span>
               </div>
            </div>
+        </Card>
+
+        <Card className="p-6 sm:p-8 bg-white dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Validated junction records</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">A live sample from the backend splice-site track.</p>
+            </div>
+            <span className="text-xs font-mono text-muted-foreground">{recordsLoading ? 'Loading…' : `${spliceRecords.length} records`}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border text-[10px] uppercase tracking-widest text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-3">Chromosome</th>
+                  <th className="px-3 py-3">Coordinates</th>
+                  <th className="px-3 py-3">Gene</th>
+                  <th className="px-3 py-3">Strand</th>
+                  <th className="px-3 py-3">Canonical</th>
+                </tr>
+              </thead>
+              <tbody>
+                {spliceRecords.map((record) => (
+                  <tr key={`${record.chrom}-${record.start}-${record.transcript_id}`} className="border-b border-border/60 last:border-0">
+                    <td className="px-3 py-3 font-mono font-semibold">{record.chrom}</td>
+                    <td className="px-3 py-3 font-mono text-muted-foreground">{record.start.toLocaleString()}–{record.end.toLocaleString()}</td>
+                    <td className="px-3 py-3">{record.gene_id}</td>
+                    <td className="px-3 py-3">{record.strand}</td>
+                    <td className="px-3 py-3">{record.is_canonical ? 'Yes' : 'No'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!recordsLoading && spliceRecords.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">No splice records are available for this assembly.</p>
+            )}
+          </div>
         </Card>
 
       </div>

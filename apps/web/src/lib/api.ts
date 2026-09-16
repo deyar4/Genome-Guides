@@ -22,6 +22,7 @@ import {
   RNASummary,
   HostGuestRelationship,
   SpliceSiteConsensus,
+  SpliceSiteRecord,
   RNAEditingSite,
   ProteinStats,
   AminoAcidComposition,
@@ -33,10 +34,9 @@ import {
   CorrelationResult,
   UTRCorrelation,
   KmerResponse,
-  SystemJob,
-  BuildResponse,
   SystemHealth,
-  SystemReady
+  SystemReady,
+  TrackDataResponse
 } from "@/types/api";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
@@ -97,8 +97,6 @@ export const dnaApi = {
     fetcher<SSRDensityWindow[]>("/dna/ssr/density", { build, chrom, window_size }),
   getSSREnrichment: (build: string, chrom: string, top_n = 20) =>
     fetcher<{ motif: string; count: number }[]>("/dna/ssr/enrichment", { build, chrom, top_n }),
-  getSSRStats: (build: string, chrom: string) =>
-    fetcher<Record<string, number>>("/dna/ssr/stats", { build, chrom }),
   getAssembly: (build: string) => fetcher<AssemblyStats>("/dna/stats/assembly", { build }),
   getSequence: (build: string, chrom: string, start: number, end: number) => 
     fetcher<string>("/dna/sequence", { build, chrom, start, end }),
@@ -143,6 +141,8 @@ export const rnaApi = {
     fetcher<HostGuestRelationship[]>("/rna/relationships", { build, ...params }),
   getSpliceConsensus: (build: string, site_type?: string) => 
     fetcher<SpliceSiteConsensus[]>("/rna/splice-sites", { build, ...(site_type ? { site_type } : {}) }),
+  getSpliceRecords: (build: string, params: { site_type?: string; chrom?: string; limit?: number } = {}) =>
+    fetcher<SpliceSiteRecord[]>("/rna/splice-sites/records", { build, ...params }),
   getEditingSites: (build: string, gene_id: string) => 
     fetcher<RNAEditingSite[]>(`/rna/editing/${gene_id}`, { build }),
 };
@@ -164,9 +164,11 @@ export const proteinsApi = {
 
 export const systemApi = {
   getGenomes: () => fetcher<string[]>("/system/genomes"),
-  triggerBuild: (cores = 1) => fetcher<BuildResponse>("/system/build", { cores }),
-  getJobStatus: (jobId: number) => fetcher<SystemJob>(`/system/jobs/${jobId}`),
-  listJobs: (limit = 10) => fetcher<SystemJob[]>("/system/jobs", { limit }),
   getHealth: () => fetcher<SystemHealth>("/system/health"),
   getReady: () => fetcher<SystemReady>("/system/ready"),
+};
+
+export const tracksApi = {
+  getSummary: <T = Record<string, unknown>>(genome: string, trackName: string) =>
+    fetcher<TrackDataResponse<T>>(`/summary/${genome}/${trackName}`),
 };
