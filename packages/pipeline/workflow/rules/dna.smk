@@ -43,7 +43,8 @@ rule compute_ssrs:
         density="data/tracks/{genome}/all/ssr_density.parquet",
         enrichment="data/tracks/{genome}/all/ssr_enrichment.parquet"
     params:
-        window_size=config["tracks"]["ssr"]["window_size"]
+        window_size=config["tracks"]["ssr"]["window_size"],
+        chunk_bases=config["tracks"]["ssr"]["chunk_bases"]
     log:
         "logs/{genome}/compute_ssrs.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -53,7 +54,8 @@ rule compute_ssrs:
         """
         exec > {log} 2>&1
         python3 packages/pipeline/scripts/dna/extract_ssrs.py \
-            -f {input.fasta} -o data/tracks/{wildcards.genome}/all -w {params.window_size}
+            -f {input.fasta} -o data/tracks/{wildcards.genome}/all \
+            -w {params.window_size} --chunk-bases {params.chunk_bases}
         """
 
 rule compute_isochores:

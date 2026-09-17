@@ -37,6 +37,7 @@ tracks:
   ssr:
     enabled: true
     window_size: 1000000
+    chunk_bases: 4000000
     min_period: 1
     max_period: 6
   isochores:

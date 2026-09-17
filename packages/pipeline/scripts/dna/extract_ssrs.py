@@ -43,28 +43,54 @@ def scan(chrom, sequence):
     return selected
 
 
-def extract(fasta, out_dir, window_size=1_000_000):
-    hits = []
+def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
+    if window_size < 1 or chunk_bases < 1:
+        raise ValueError("window size and chunk size must be positive")
+
     chrom_lengths = {}
+    period_counts = Counter()
+    period_bases = Counter()
+    density_counts = Counter()
+    total_ssr_bases = 0
     open_fn = gzip.open if str(fasta).endswith(".gz") else open
     chrom, block, carry = None, [], ""
     offset, length, block_length = 0, 0, 0
     seen = set()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    hit_schema = {
+        "chrom": pa.string(), "start": pa.uint64(), "end": pa.uint64(), "motif": pa.string(),
+        "period": pa.uint8(), "repeat_count": pa.uint32(), "sequence": pa.string(),
+        "length": pa.uint64(), "period_name": pa.string(), "complexity": pa.float32(),
+    }
+    hit_writer = pq.ParquetWriter(out / "ssr_hits.parquet", pa.schema([
+        pa.field(name, dtype) for name, dtype in hit_schema.items()
+    ]), compression="zstd")
 
     def flush():
-        nonlocal block, carry, hits, block_length
+        nonlocal block, carry, block_length, total_ssr_bases
         if chrom is None or not block:
             return
         sequence = "".join(block)
         combined = carry + sequence
         combined_offset = offset - len(carry)
+        batch = []
         for hit in scan(chrom, combined):
             hit["start"] += combined_offset
             hit["end"] += combined_offset
             key = (hit["start"], hit["end"], hit["motif"])
             if key not in seen and hit["start"] >= 0:
                 seen.add(key)
-                hits.append(hit)
+                batch.append(hit)
+                period_counts[hit["period"]] += 1
+                period_bases[hit["period"]] += hit["length"]
+                density_counts[(chrom, (hit["start"] // window_size) * window_size)] += 1
+                total_ssr_bases += hit["length"]
+        if batch:
+            hit_writer.write_table(pa.table({
+                key: pa.array([row[key] for row in batch], type=value)
+                for key, value in hit_schema.items()
+            }))
         carry = combined[-1024:]
         block = []
         block_length = 0
@@ -83,37 +109,33 @@ def extract(fasta, out_dir, window_size=1_000_000):
                 block.append(sequence)
                 length += len(sequence)
                 block_length += len(sequence)
-                if block_length >= 4_000_000:
+                if block_length >= chunk_bases:
                     flush()
                     offset = length
         if chrom is not None:
             flush()
             chrom_lengths[chrom] = length
+    hit_writer.close()
 
     summaries = []
-    by_period = defaultdict(list)
-    for hit in hits:
-        by_period[hit["period"]].append(hit)
     for period in sorted(PERIOD_NAMES):
-        rows = by_period[period]
         summaries.append({
-            "period": period, "name": PERIOD_NAMES[period], "count": len(rows),
-            "total_length": sum(r["length"] for r in rows),
-            "avg_repeat_count": sum(r["repeat_count"] for r in rows) / len(rows) if rows else 0.0,
+            "period": period, "name": PERIOD_NAMES[period], "count": period_counts[period],
+            "total_length": period_bases[period],
+            "avg_repeat_count": period_bases[period] / (period_counts[period] * period)
+            if period_counts[period] else 0.0,
         })
 
-    density_counts = Counter((h["chrom"], (h["start"] // window_size) * window_size) for h in hits)
     density = [{
         "chrom": chrom, "start": start, "end": min(chrom_lengths.get(chrom, start + window_size), start + window_size),
         "count": count,
     } for (chrom, start), count in sorted(density_counts.items())]
 
     genome_length = sum(chrom_lengths.values()) or 1
-    genome_ssr_bases = sum(h["length"] for h in hits)
+    genome_ssr_bases = total_ssr_bases
     enrichment = []
     for period in sorted(PERIOD_NAMES):
-        rows = by_period[period]
-        observed = sum(r["length"] for r in rows)
+        observed = period_bases[period]
         expected = genome_length * (0.25 ** period)
         enrichment.append({
             "period": period, "name": PERIOD_NAMES[period], "observed_bases": observed,
@@ -121,13 +143,6 @@ def extract(fasta, out_dir, window_size=1_000_000):
             "enrichment": observed / expected if expected else 0.0,
         })
 
-    out = Path(out_dir)
-    schema = {
-        "chrom": pa.string(), "start": pa.uint64(), "end": pa.uint64(), "motif": pa.string(),
-        "period": pa.uint8(), "repeat_count": pa.uint32(), "sequence": pa.string(),
-        "length": pa.uint64(), "period_name": pa.string(), "complexity": pa.float32(),
-    }
-    write(out / "ssr_hits.parquet", hits, schema)
     write(out / "ssr_summary.parquet", summaries, {
         "period": pa.uint8(), "name": pa.string(), "count": pa.uint64(),
         "total_length": pa.uint64(), "avg_repeat_count": pa.float64(),
@@ -146,5 +161,6 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--fasta", required=True)
     parser.add_argument("-o", "--out-dir", required=True)
     parser.add_argument("-w", "--window-size", type=int, default=1_000_000)
+    parser.add_argument("--chunk-bases", type=int, default=4_000_000)
     args = parser.parse_args()
-    extract(args.fasta, args.out_dir, args.window_size)
+    extract(args.fasta, args.out_dir, args.window_size, args.chunk_bases)
