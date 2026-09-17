@@ -89,6 +89,35 @@ def write_batched_csv(input_tsv, output_parquet, schema, new_columns):
     if writer is None:
         pl.DataFrame(schema=schema).write_parquet(output_parquet, compression="zstd")
 
+
+def write_batched_assembly_gaps(input_tsv, output_parquet, schema):
+    batches = pl.scan_csv(
+        input_tsv,
+        separator="\t",
+        has_header=False,
+        new_columns=["chrom", "start", "end", "name", "score", "strand"],
+        schema_overrides={"chrom": pl.Utf8, "start": pl.UInt32, "end": pl.UInt32},
+    ).collect_batches(chunk_size=65_536)
+    writer = None
+    try:
+        for batch in batches:
+            frame = batch.select([
+                pl.col("chrom").alias("contig"),
+                pl.col("start").alias("start_pos"),
+                pl.col("end").alias("end_pos"),
+                (pl.col("end") - pl.col("start")).alias("gap_length"),
+                pl.lit("assembly_gap").alias("gap_type"),
+            ]).cast(schema)
+            arrow = frame.to_arrow()
+            if writer is None:
+                writer = pq.ParquetWriter(output_parquet, arrow.schema, compression="zstd")
+            writer.write_table(arrow)
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        pl.DataFrame(schema=schema).write_parquet(output_parquet, compression="zstd")
+
 def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str):
     schema = SCHEMAS[schema_name]
     out_path = Path(output_parquet)
@@ -200,15 +229,9 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
 
             num_cols = len(first_line.split("\t")) if first_line else 0
             if num_cols == 6:
-                df = pl.read_csv(input_tsv, separator="\t", has_header=False,
-                                 new_columns=["chrom", "start", "end", "name", "score", "strand"])
-                df = df.select([
-                    pl.col("chrom").cast(schema["contig"]).alias("contig"),
-                    pl.col("start").cast(schema["start_pos"]).alias("start_pos"),
-                    pl.col("end").cast(schema["end_pos"]).alias("end_pos"),
-                    (pl.col("end") - pl.col("start")).cast(schema["gap_length"]).alias("gap_length"),
-                    pl.lit("assembly_gap").cast(schema["gap_type"]).alias("gap_type")
-                ])
+                write_batched_assembly_gaps(input_tsv, output_parquet, schema)
+                print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
+                return
             else:
                 # Fallback to standard reading
                 col_names = list(schema.keys())
