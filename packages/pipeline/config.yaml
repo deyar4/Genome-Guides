@@ -6,6 +6,7 @@ interim_dir: "data/interim"
 tracks_dir: "data/tracks"
 
 defaults:
+  # 1 kb balances local sequence variation against browser-scale track size.
   window_size: 1000
   step_size: 1000
   threads: 4
@@ -32,15 +33,19 @@ tracks:
     step_size: 1000
   hecate_bwt:
     enabled: false
+    # Match the probability track's local entropy resolution without large batches.
     kmer_length: 21
     window_size: 100
     chunk_windows: 1000
   ssr:
     enabled: true
+    # 1 Mb bins support genome-wide enrichment comparisons without dense output.
     window_size: 1000000
+    # Four million bases bounds regex working memory on 16 GB laptops.
     chunk_bases: 4000000
     min_period: 1
     max_period: 6
   isochores:
     enabled: true
+    # Classical GC boundaries used by the L1/L2/H1/H2/H3 classification.
     thresholds: [37, 41, 46, 53]
