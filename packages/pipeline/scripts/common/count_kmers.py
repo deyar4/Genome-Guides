@@ -3,47 +3,59 @@ import argparse
 import re
 from collections import Counter
 
-def read_fasta(file_path):
-    seq_id = ""
-    seq = []
-    with open(file_path, 'r') as f:
-        for line in f:
-            if line.startswith(">"):
-                if seq_id:
-                    yield seq_id, "".join(seq)
-                seq_id = line[1:].strip()
-                seq = []
-            else:
-                seq.append(line.strip().upper())
-        if seq_id:
-            yield seq_id, "".join(seq)
-
 def count_kmers(fasta_file, k, output_file, is_dinucleotide=False):
+    if k < 1:
+        raise ValueError("k must be at least 1")
+
     valid_pattern = re.compile(r'[^ACGT]')
     
     kmer_counts = Counter()
     single_counts = Counter()
     total_kmers = 0
     total_singles = 0
-    
-    for seq_id, seq in read_fasta(fasta_file):
-        valid_blocks = valid_pattern.split(seq)
-        for block in valid_blocks:
-            block_len = len(block)
-            if block_len < k:
-                if is_dinucleotide:
-                    # Even if block is too short for a kmer, it still has singles
-                    single_counts.update(block)
-                    total_singles += block_len
+
+    def consume_block(block, carry, final=False):
+        nonlocal total_kmers, total_singles
+        if is_dinucleotide:
+            single_counts.update(block)
+            total_singles += len(block)
+
+        combined = carry + block
+        if final:
+            start = 0
+            next_carry = ""
+        else:
+            keep = min(k - 1, len(combined))
+            next_carry = combined[-keep:] if keep else ""
+            start = max(0, len(carry) - k + 1)
+
+        if len(combined) - start >= k:
+            process = combined[start:]
+            kmer_counts.update(
+                process[i:i + k] for i in range(len(process) - k + 1)
+            )
+            total_kmers += len(process) - k + 1
+        return next_carry
+
+    # Keep at most k-1 bases between chunks so k-mers spanning FASTA lines survive
+    # without materializing an entire chromosome.
+    with open(fasta_file, "r") as handle:
+        carry = ""
+        for line in handle:
+            if line.startswith(">"):
+                if carry:
+                    carry = consume_block("", carry, final=True)
                 continue
-            
-            if is_dinucleotide:
-                single_counts.update(block)
-                total_singles += block_len
-                
-            kmers = (block[i:i+k] for i in range(block_len - k + 1))
-            kmer_counts.update(kmers)
-            total_kmers += block_len - k + 1
+
+            blocks = valid_pattern.split(line.strip().upper())
+            for index, block in enumerate(blocks):
+                if index and carry:
+                    consume_block("", carry, final=True)
+                    carry = ""
+                carry = consume_block(block, carry)
+
+        if carry:
+            consume_block("", carry, final=True)
 
     with open(output_file, 'w') as f:
         for kmer, count in kmer_counts.most_common():
