@@ -23,11 +23,24 @@ def attrs(text):
 
 def write_table(path, rows, columns):
     path.parent.mkdir(parents=True, exist_ok=True)
-    arrays = {}
-    for name, kind in columns:
-        values = [row.get(name) for row in rows]
-        arrays[name] = pa.array(values, type=kind)
-    pq.write_table(pa.table(arrays), path, compression="zstd")
+    writer = None
+    try:
+        for offset in range(0, len(rows), 65536):
+            batch = rows[offset:offset + 65536]
+            arrays = {
+                name: pa.array([row.get(name) for row in batch], type=kind)
+                for name, kind in columns
+            }
+            table = pa.table(arrays)
+            if writer is None:
+                writer = pq.ParquetWriter(path, table.schema, compression="zstd")
+            writer.write_table(table)
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        schema = pa.schema([(name, kind) for name, kind in columns])
+        pq.write_table(pa.Table.from_pylist([], schema=schema), path, compression="zstd")
 
 
 def parse(gtf, out_dir):

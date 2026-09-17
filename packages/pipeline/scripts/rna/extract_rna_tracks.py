@@ -59,7 +59,28 @@ class FastaIndex:
 
 def write(path, rows, schema):
     path.parent.mkdir(parents=True, exist_ok=True)
-    pq.write_table(pa.table({k: pa.array([r.get(k) for r in rows], type=t) for k, t in schema.items()}), path, compression="zstd")
+    writer = None
+    try:
+        for offset in range(0, len(rows), 65536):
+            batch = rows[offset:offset + 65536]
+            table = pa.table({
+                key: pa.array([row.get(key) for row in batch], type=kind)
+                for key, kind in schema.items()
+            })
+            if writer is None:
+                writer = pq.ParquetWriter(path, table.schema, compression="zstd")
+            writer.write_table(table)
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        pq.write_table(
+            pa.Table.from_pylist([], schema=pa.schema([
+                pa.field(key, kind) for key, kind in schema.items()
+            ])),
+            path,
+            compression="zstd",
+        )
 
 
 def extract(gtf, fasta, out_dir):
