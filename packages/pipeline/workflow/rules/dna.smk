@@ -79,7 +79,8 @@ rule compute_kmers_3mer:
     input:
         fasta="data/raw/{genome}.fa"
     output:
-        parquet="data/tracks/{genome}/all/kmers_3mer.parquet"
+        parquet="data/tracks/{genome}/all/kmers_3mer.parquet",
+        tsv=temp("data/tracks/{genome}/all/kmers_3mer.tsv")
     log:
         "logs/{genome}/compute_kmers_3mer.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -89,16 +90,16 @@ rule compute_kmers_3mer:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all
-        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/tracks/{wildcards.genome}/all/kmers_3mer.tsv -k 3
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/tracks/{wildcards.genome}/all/kmers_3mer.tsv -o {output.parquet} -t kmers_3mer
-        rm -f data/tracks/{wildcards.genome}/all/kmers_3mer.tsv
+        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o {output.tsv} -k 3
+        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t kmers_3mer
         """
 
 rule compute_kmers_6mer:
     input:
         fasta="data/raw/{genome}.fa"
     output:
-        parquet="data/tracks/{genome}/all/kmers_6mer.parquet"
+        parquet="data/tracks/{genome}/all/kmers_6mer.parquet",
+        tsv=temp("data/tracks/{genome}/all/kmers_6mer.tsv")
     log:
         "logs/{genome}/compute_kmers_6mer.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -108,9 +109,8 @@ rule compute_kmers_6mer:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all
-        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/tracks/{wildcards.genome}/all/kmers_6mer.tsv -k 6
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/tracks/{wildcards.genome}/all/kmers_6mer.tsv -o {output.parquet} -t kmers_6mer
-        rm -f data/tracks/{wildcards.genome}/all/kmers_6mer.tsv
+        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o {output.tsv} -k 6
+        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t kmers_6mer
         """
 
 rule compute_shannon_entropy:
@@ -156,7 +156,8 @@ rule compute_dinucleotides:
     input:
         fasta="data/raw/{genome}.fa"
     output:
-        parquet="data/tracks/{genome}/all/dinucleotide_frequencies.parquet"
+        parquet="data/tracks/{genome}/all/dinucleotide_frequencies.parquet",
+        tsv=temp("data/interim/{genome}/dinucleotides.tsv")
     log:
         "logs/{genome}/compute_dinucleotides.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -166,9 +167,8 @@ rule compute_dinucleotides:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/interim/{wildcards.genome}/dinucleotides.tsv -k 2 --dinucleotide
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/interim/{wildcards.genome}/dinucleotides.tsv -o {output.parquet} -t dinucleotides
-        rm -f data/interim/{wildcards.genome}/dinucleotides.tsv
+        python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o {output.tsv} -k 2 --dinucleotide
+        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t dinucleotides
         """
 
 rule compute_genomic_homopolymers:

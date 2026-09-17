@@ -7,6 +7,7 @@ import sys
 import argparse
 import polars as pl
 from pathlib import Path
+import pyarrow.parquet as pq
 
 # We define the column names and types for each schema
 SCHEMAS = {
@@ -63,6 +64,30 @@ def parse_args():
     parser.add_argument("--output", "-o", required=True, help="Output Parquet file")
     parser.add_argument("--schema", "-s", required=True, choices=list(SCHEMAS.keys()), help="Schema name")
     return parser.parse_args()
+
+
+def write_batched_csv(input_tsv, output_parquet, schema, new_columns):
+    batches = pl.scan_csv(
+        input_tsv,
+        separator="\t",
+        has_header=False,
+        new_columns=new_columns,
+        schema_overrides=schema,
+    ).collect_batches(chunk_size=65_536)
+    writer = None
+    try:
+        for frame in batches:
+            frame = frame.cast(schema)
+            if writer is None:
+                writer = pq.ParquetWriter(
+                    output_parquet, frame.to_arrow().schema, compression="zstd"
+                )
+            writer.write_table(frame.to_arrow())
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        pl.DataFrame(schema=schema).write_parquet(output_parquet, compression="zstd")
 
 def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str):
     schema = SCHEMAS[schema_name]
@@ -194,12 +219,10 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                 f"Error: Could not parse assembly gaps from '{input_tsv}': {exc}"
             ) from exc
     else:
-        col_names = list(schema.keys())
-        # Use read_csv with matching columns
         try:
-            df = pl.read_csv(input_tsv, separator="\t", has_header=False, new_columns=col_names)
-            # Ensure types match the schema precisely
-            df = df.cast(schema)
+            write_batched_csv(input_tsv, output_parquet, schema, list(schema.keys()))
+            print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
+            return
         except (ValueError, pl.exceptions.PolarsError) as exc:
             raise SystemExit(
                 f"Error: Could not parse TSV '{input_tsv}' as schema '{schema_name}': {exc}"
