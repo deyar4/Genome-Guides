@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 
 ATTR_RE = re.compile(r'(?:^|[;\s])([A-Za-z_][\w.-]*)\s*[= ]\s*"?(.*?)(?:"?)(?:;|$)')
@@ -51,6 +54,7 @@ def parse(gtf, out_dir):
     exons_by_tx = defaultdict(list)
     utr_by_tx = defaultdict(lambda: {"5": 0, "3": 0})
     genes = {}
+    malformed_rows = 0
     open_fn = gzip.open if str(gtf).endswith(".gz") else open
 
     with open_fn(gtf, "rt") as handle:
@@ -59,11 +63,13 @@ def parse(gtf, out_dir):
                 continue
             fields = line.rstrip("\n").split("\t")
             if len(fields) < 9:
+                malformed_rows += 1
                 continue
             chrom, _, feature, start, end, _, strand, _, raw_attrs = fields
             try:
                 start0, end0 = int(start) - 1, int(end)
             except ValueError:
+                malformed_rows += 1
                 continue
             a = attrs(raw_attrs)
             tx = a.get("transcript_id") or a.get("ID")
@@ -180,11 +186,14 @@ def parse(gtf, out_dir):
         ("intron_count", pa.uint32()), ("exon_bases", pa.uint64()), ("intron_bases", pa.uint64()),
         ("utr5_bases", pa.uint64()), ("utr3_bases", pa.uint64()), ("cds_bases", pa.uint64()),
     ])
+    if malformed_rows:
+        print(f"Warning: skipped {malformed_rows} malformed annotation rows.", file=sys.stderr)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--out-dir", required=True)
+    add_resource_args(parser)
     args = parser.parse_args()
     parse(args.input, args.out_dir)

@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args, effective_memory_mb
 
 
 PERIOD_NAMES = {1: "mono", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
@@ -162,5 +165,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--out-dir", required=True)
     parser.add_argument("-w", "--window-size", type=int, default=1_000_000)
     parser.add_argument("--chunk-bases", type=int, default=4_000_000)
+    add_resource_args(parser)
     args = parser.parse_args()
-    extract(args.fasta, args.out_dir, args.window_size, args.chunk_bases)
+    chunk_bases = min(args.chunk_bases, max(100_000, effective_memory_mb(args.memory_mb) * 250))
+    extract(args.fasta, args.out_dir, args.window_size, chunk_bases)

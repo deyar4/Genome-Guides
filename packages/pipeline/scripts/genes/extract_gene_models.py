@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 from collections import defaultdict
 import polars as pl
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 # Precompiled regex for rapid extraction of key GTF/GFF attributes
 ATTR_RE = re.compile(
@@ -22,6 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Parse GFF3/GTF annotations to Parquet.")
     parser.add_argument("--input", "-i", required=True, help="Input GFF3 or GTF file (.gff3, .gtf, .gz)")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory for track parquet files")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def parse_attributes_fast(attr_str):
@@ -36,6 +39,7 @@ def run_parser(input_path: str, out_dir: str):
     biotype_counts = defaultdict(int)
     gene_density_windows = defaultdict(int)
     window_size = 100000  # 100kb density windows
+    malformed_rows = 0
 
     open_fn = gzip.open if input_path.endswith(".gz") else open
 
@@ -45,6 +49,7 @@ def run_parser(input_path: str, out_dir: str):
                 continue
             parts = line.strip().split("\t")
             if len(parts) < 9:
+                malformed_rows += 1
                 continue
 
             contig, _, feature_type, start_str, end_str, _, strand, _, attr_str = parts
@@ -55,6 +60,7 @@ def run_parser(input_path: str, out_dir: str):
                 start = int(start_str) - 1  # 0-based
                 end = int(end_str)
             except ValueError:
+                malformed_rows += 1
                 continue
 
             attrs = parse_attributes_fast(attr_str)
@@ -129,6 +135,8 @@ def run_parser(input_path: str, out_dir: str):
 
     b_df.write_parquet(out_p / "gene_biotype_census.parquet", compression="zstd")
     print(f"Created gene_biotype_census.parquet with {len(b_rows)} biotypes.")
+    if malformed_rows:
+        print(f"Warning: skipped {malformed_rows} malformed annotation rows.", file=sys.stderr)
 
 if __name__ == "__main__":
     args = parse_args()

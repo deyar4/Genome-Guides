@@ -8,6 +8,7 @@ import argparse
 import polars as pl
 from pathlib import Path
 import pyarrow.parquet as pq
+from resource_args import add_resource_args
 
 # We define the column names and types for each schema
 SCHEMAS = {
@@ -63,6 +64,7 @@ def parse_args():
     parser.add_argument("--input", "-i", required=True, help="Input TSV file")
     parser.add_argument("--output", "-o", required=True, help="Output Parquet file")
     parser.add_argument("--schema", "-s", required=True, choices=list(SCHEMAS.keys()), help="Schema name")
+    add_resource_args(parser)
     return parser.parse_args()
 
 

@@ -12,6 +12,10 @@ import re
 from pathlib import Path
 from collections import defaultdict, Counter
 import polars as pl
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 # Precompiled regex for rapid extraction of key GTF/GFF attributes
 ATTR_RE = re.compile(
@@ -22,6 +26,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Extract Splice Site Consensus & Detailed ncRNA Census.")
     parser.add_argument("--gtf", "-g", required=True, help="Input GTF file (.gtf, .gz)")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def parse_attributes_fast(attr_str):

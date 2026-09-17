@@ -4,6 +4,9 @@ from pathlib import Path
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from resource_args import add_resource_args, effective_memory_mb
 
 def process_mprob(fai_path, xz_path, out_path, window_size=1000, chunk_windows=1000):
     if window_size < 1:
@@ -135,5 +138,7 @@ if __name__ == "__main__":
         default=1000,
         help="Maximum windows buffered per input batch (default: 1000)",
     )
+    add_resource_args(parser)
     args = parser.parse_args()
-    process_mprob(args.fai, args.input, args.output, args.window, args.chunk_windows)
+    chunk_windows = min(args.chunk_windows, max(100, effective_memory_mb(args.memory_mb) // 4))
+    process_mprob(args.fai, args.input, args.output, args.window, chunk_windows)

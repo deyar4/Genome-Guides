@@ -9,6 +9,9 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 
 ATTR_RE = re.compile(r'(?:^|[;\s])([A-Za-z_][\w.-]*)\s*[= ]\s*"?(.*?)(?:"?)(?:;|$)')
@@ -87,6 +90,7 @@ def extract(gtf, fasta, out_dir):
     exons = defaultdict(list)
     transcripts = {}
     ncrna = Counter()
+    malformed_rows = 0
     open_fn = gzip.open if str(gtf).endswith(".gz") else open
     with open_fn(gtf, "rt") as handle:
         for line in handle:
@@ -94,6 +98,7 @@ def extract(gtf, fasta, out_dir):
                 continue
             f = line.rstrip("\n").split("\t")
             if len(f) < 9:
+                malformed_rows += 1
                 continue
             chrom, _, feature, start, end, _, strand, _, raw = f
             if feature not in {"transcript", "mRNA", "exon"}:
@@ -105,7 +110,11 @@ def extract(gtf, fasta, out_dir):
             gene = a.get("gene_id") or a.get("gene_name") or "UNKNOWN"
             name = a.get("gene_name") or gene
             biotype = a.get("gene_biotype") or a.get("gene_type") or rna_biotype(tx, name, raw)
-            start0, end0 = int(start) - 1, int(end)
+            try:
+                start0, end0 = int(start) - 1, int(end)
+            except ValueError:
+                malformed_rows += 1
+                continue
             if feature in {"transcript", "mRNA"}:
                 transcripts[tx] = (chrom, start0, end0, strand, gene, name, biotype)
                 if biotype != "protein_coding":
@@ -222,6 +231,8 @@ def extract(gtf, fasta, out_dir):
         "rna_type": pa.string(), "num_clusters": pa.uint64(), "avg_cluster_size": pa.float64(),
         "max_cluster_size": pa.uint32(), "largest_cluster_location": pa.string()
     })
+    if malformed_rows:
+        print(f"Warning: skipped {malformed_rows} malformed annotation rows.", file=sys.stderr)
 
 
 if __name__ == "__main__":
@@ -229,5 +240,6 @@ if __name__ == "__main__":
     p.add_argument("-g", "--gtf", required=True)
     p.add_argument("-f", "--fasta", required=True)
     p.add_argument("-o", "--out-dir", required=True)
+    add_resource_args(p)
     a = p.parse_args()
     extract(a.gtf, a.fasta, a.out_dir)
