@@ -16,3 +16,20 @@ Genome-scale converters use bounded batches. SSR and Hecate batch sizes are
 configurable in `packages/pipeline/config.yaml`; increasing them trades memory
 for throughput. Window sizes are analytical parameters, so changing them
 changes the biological resolution of the output.
+
+## Compliance checklist
+
+- **Architecture:** Snakemake rules orchestrate external tools and analytical
+  scripts; helper modules expose standard input/output and resource flags.
+- **Resources:** Every workflow rule declares threads, `mem_mb`, and separate
+  stdout/stderr logs. Runtime memory is detected for direct script use and can
+  be overridden with `--memory-mb` or Snakemake resources.
+- **Memory safety:** FASTA, TSV, Parquet, annotation, and RNA processing use
+  bounded batches, row groups, or temporary SQLite spill tables. No complete
+  chromosome or genome-wide matrix is materialized.
+- **Errors:** Missing files, invalid schemas, invalid resource values, and
+  malformed input records produce explicit failures or stderr warnings.
+- **Style:** Comments state biological or computational rationale; module
+  descriptions are concise and avoid generic template text.
+- **Validation:** Use the smoke test, Snakemake dry-run, backend tests, Python
+  compilation, and `git diff --check` before committing changes.
