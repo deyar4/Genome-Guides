@@ -10,6 +10,8 @@ import gzip
 from pathlib import Path
 from collections import defaultdict
 import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract RepeatMasker TE Landscape.")
@@ -21,9 +23,17 @@ def process_repeatmasker(input_path: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    te_rows = []
     density_windows = defaultdict(int)
     window_size = 100000  # 100kb
+    te_schema = pa.schema([
+        ("contig", pa.string()), ("start_pos", pa.uint32()), ("end_pos", pa.uint32()),
+        ("strand", pa.string()), ("te_name", pa.string()), ("te_class", pa.string()),
+        ("divergence_pct", pa.float32()),
+    ])
+    te_path = out_p / "repeatmasker_families.parquet"
+    te_writer = pq.ParquetWriter(te_path, te_schema, compression="zstd")
+    batch = []
+    record_count = 0
 
     open_fn = gzip.open if input_path.endswith(".gz") else open
 
@@ -49,31 +59,25 @@ def process_repeatmasker(input_path: str, out_dir: str):
                 te_name = parts[9]
                 te_class = parts[10]
 
-                te_rows.append((contig, start, end, strand, te_name, te_class, float(div_pct)))
+                batch.append((contig, start, end, strand, te_name, te_class, float(div_pct)))
+                record_count += 1
+                if len(batch) >= 65_536:
+                    te_writer.write_table(pa.Table.from_pylist([
+                        dict(zip(te_schema.names, row)) for row in batch
+                    ], schema=te_schema))
+                    batch.clear()
 
                 w_idx = start // window_size
                 density_windows[(contig, w_idx * window_size)] += 1
             except ValueError:
                 continue
+    if batch:
+        te_writer.write_table(pa.Table.from_pylist([
+            dict(zip(te_schema.names, row)) for row in batch
+        ], schema=te_schema))
+    te_writer.close()
 
-    # 1. Write RepeatMasker TE Families Parquet
-    te_schema = {
-        "contig": pl.Utf8,
-        "start_pos": pl.UInt32,
-        "end_pos": pl.UInt32,
-        "strand": pl.Utf8,
-        "te_name": pl.Utf8,
-        "te_class": pl.Utf8,
-        "divergence_pct": pl.Float32
-    }
-
-    if te_rows:
-        te_df = pl.DataFrame(te_rows, schema=te_schema, orient="row")
-    else:
-        te_df = pl.DataFrame(schema=te_schema)
-
-    te_df.write_parquet(out_p / "repeatmasker_families.parquet", compression="zstd")
-    print(f"Created repeatmasker_families.parquet with {len(te_rows)} transposable elements.")
+    print(f"Created repeatmasker_families.parquet with {record_count} transposable elements.")
 
     # 2. Write RepeatMasker Density Parquet
     d_schema = {
