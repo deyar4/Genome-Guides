@@ -86,6 +86,35 @@ def write(path, rows, schema):
         )
 
 
+class ParquetRowWriter:
+    def __init__(self, path, schema):
+        self.path = path
+        self.schema = pa.schema([pa.field(key, kind) for key, kind in schema.items()])
+        self.rows = []
+        self.writer = None
+
+    def append(self, row):
+        self.rows.append(row)
+        if len(self.rows) >= 65536:
+            self.flush()
+
+    def flush(self):
+        if not self.rows:
+            return
+        table = pa.Table.from_pylist(self.rows, schema=self.schema)
+        if self.writer is None:
+            self.writer = pq.ParquetWriter(self.path, self.schema, compression="zstd")
+        self.writer.write_table(table)
+        self.rows.clear()
+
+    def close(self):
+        self.flush()
+        if self.writer is not None:
+            self.writer.close()
+        else:
+            pq.write_table(pa.Table.from_pylist([], schema=self.schema), self.path, compression="zstd")
+
+
 def extract(gtf, fasta, out_dir):
     exons = defaultdict(list)
     transcripts = {}
@@ -123,7 +152,16 @@ def extract(gtf, fasta, out_dir):
                 exons[tx].append((start0, end0, chrom, strand, gene))
 
     fa = FastaIndex(fasta)
-    junctions, donor_counts, acceptor_counts = [], Counter(), Counter()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    junction_schema = {
+        "contig": pa.string(), "intron_start": pa.uint64(), "intron_end": pa.uint64(),
+        "transcript_id": pa.string(), "gene_id": pa.string(), "strand": pa.string(),
+        "junction_number": pa.uint32(), "donor_seq": pa.string(), "acceptor_seq": pa.string(),
+        "is_canonical": pa.uint8(),
+    }
+    junction_writer = ParquetRowWriter(out / "splice_sites.parquet", junction_schema)
+    donor_counts, acceptor_counts = Counter(), Counter()
     pwm_counts = {"donor": [Counter() for _ in range(2)], "acceptor": [Counter() for _ in range(2)]}
     for tx, parts in exons.items():
         parts.sort()
@@ -148,7 +186,7 @@ def extract(gtf, fasta, out_dir):
             for i, base in enumerate(acceptor):
                 if i < 2:
                     pwm_counts["acceptor"][i][base] += 1
-            junctions.append({
+            junction_writer.append({
                 "contig": chrom, "intron_start": left[1], "intron_end": right[0],
                 "transcript_id": tx, "gene_id": gene, "strand": strand,
                 "junction_number": number, "donor_seq": donor, "acceptor_seq": acceptor,
@@ -179,13 +217,7 @@ def extract(gtf, fasta, out_dir):
         "genes": ",".join(sorted(set(c["genes"]))),
     } for i, c in enumerate(clusters, 1)]
 
-    out = Path(out_dir)
-    write(out / "splice_sites.parquet", junctions, {
-        "contig": pa.string(), "intron_start": pa.uint64(), "intron_end": pa.uint64(),
-        "transcript_id": pa.string(), "gene_id": pa.string(), "strand": pa.string(),
-        "junction_number": pa.uint32(), "donor_seq": pa.string(), "acceptor_seq": pa.string(),
-        "is_canonical": pa.uint8(),
-    })
+    junction_writer.close()
     consensus = []
     pwm_type = pa.struct([
         pa.field("A", pa.list_(pa.float32())), pa.field("C", pa.list_(pa.float32())),
