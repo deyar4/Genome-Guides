@@ -69,7 +69,10 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
     out_path = Path(output_parquet)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if not Path(input_tsv).exists() or Path(input_tsv).stat().st_size == 0:
+    input_path = Path(input_tsv)
+    if not input_path.exists():
+        raise SystemExit(f"Error: Input TSV not found: {input_tsv}")
+    if input_path.stat().st_size == 0:
         df = pl.DataFrame(schema=schema)
         df.write_parquet(output_parquet, compression="zstd")
         print(f"Created empty Parquet track: {output_parquet}")
@@ -83,8 +86,8 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                 first_line = f.readline()
                 if first_line.startswith("#name") or "sliding" in first_line:
                     is_seqkit_gc = True
-        except Exception:
-            pass
+        except OSError as exc:
+            raise SystemExit(f"Error: Cannot read input TSV '{input_tsv}': {exc}") from exc
 
     if is_seqkit_gc:
         try:
@@ -159,9 +162,10 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                     pl.lit(0.0).cast(schema["t_pct"]).alias("t_pct"),
                     pl.lit(0.0).cast(schema["n_pct"]).alias("n_pct")
                 ])
-        except Exception as e:
-            print(f"Error parsing seqkit GC content: {e}. Creating empty parquet.")
-            df = pl.DataFrame(schema=schema)
+        except (KeyError, ValueError, pl.exceptions.PolarsError) as exc:
+            raise SystemExit(
+                f"Error: Could not parse seqkit GC content from '{input_tsv}': {exc}"
+            ) from exc
 
     elif schema_name == "assembly_gaps":
         try:
@@ -185,9 +189,10 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                 col_names = list(schema.keys())
                 dtypes = list(schema.values())
                 df = pl.read_csv(input_tsv, separator="\t", has_header=False, new_columns=col_names, dtypes=dtypes)
-        except Exception as e:
-            print(f"Error parsing gaps: {e}. Creating empty parquet.")
-            df = pl.DataFrame(schema=schema)
+        except (ValueError, pl.exceptions.PolarsError) as exc:
+            raise SystemExit(
+                f"Error: Could not parse assembly gaps from '{input_tsv}': {exc}"
+            ) from exc
     else:
         col_names = list(schema.keys())
         # Use read_csv with matching columns
@@ -195,9 +200,10 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
             df = pl.read_csv(input_tsv, separator="\t", has_header=False, new_columns=col_names)
             # Ensure types match the schema precisely
             df = df.cast(schema)
-        except Exception as e:
-            print(f"Warning: Input TSV {input_tsv} is empty or missing. Creating empty schema parquet. ({e})")
-            df = pl.DataFrame(schema=schema)
+        except (ValueError, pl.exceptions.PolarsError) as exc:
+            raise SystemExit(
+                f"Error: Could not parse TSV '{input_tsv}' as schema '{schema_name}': {exc}"
+            ) from exc
 
     df.write_parquet(output_parquet, compression="zstd")
     print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")

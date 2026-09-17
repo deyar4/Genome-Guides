@@ -36,8 +36,16 @@ def process_spacing(input_parquet: str, out_dir: str):
 
     try:
         df = pl.read_parquet(input_parquet)
-    except Exception:
-        df = pl.DataFrame()
+    except FileNotFoundError as exc:
+        raise SystemExit(f"Error: Input Parquet not found: {input_parquet}") from exc
+    except (OSError, pl.exceptions.PolarsError) as exc:
+        raise SystemExit(f"Error: Could not read input Parquet '{input_parquet}': {exc}") from exc
+
+    required_columns = {"contig", "start_pos", "end_pos", "gene_id", "strand"}
+    missing = required_columns.difference(df.columns)
+    if missing:
+        names = ", ".join(sorted(missing))
+        raise SystemExit(f"Error: Input Parquet is missing required columns: {names}")
 
     if df.is_empty():
         pl.DataFrame(schema=sp_schema).write_parquet(out_p / "gene_spacing.parquet", compression="zstd")
