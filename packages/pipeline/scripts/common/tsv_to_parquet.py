@@ -118,6 +118,65 @@ def write_batched_assembly_gaps(input_tsv, output_parquet, schema):
     if writer is None:
         pl.DataFrame(schema=schema).write_parquet(output_parquet, compression="zstd")
 
+
+def write_batched_seqkit_gc(input_tsv, output_parquet, schema):
+    with open(input_tsv, "r") as handle:
+        header = handle.readline().rstrip("\n").split("\t")
+    if len(header) < 3:
+        raise ValueError("seqkit GC input must contain a name and two metric columns")
+    columns = [name.lower().replace("#", "").strip() for name in header]
+    batches = pl.scan_csv(
+        input_tsv,
+        separator="\t",
+        has_header=True,
+        new_columns=columns,
+        infer_schema_length=1000,
+    ).collect_batches(chunk_size=65_536)
+    writer = None
+    pattern = r"^(.*)_sliding:(\d+)-(\d+)$"
+    try:
+        for raw in batches:
+            cols = raw.columns
+            extracted = raw["name"].str.extract_groups(pattern)
+            frame = raw.with_columns([
+                pl.when(extracted.struct.field("1").is_not_null())
+                .then(extracted.struct.field("1"))
+                .otherwise(pl.col("name"))
+                .alias("contig"),
+                pl.when(extracted.struct.field("2").is_not_null())
+                .then(extracted.struct.field("2").cast(pl.UInt32) - 1)
+                .otherwise(pl.lit(0, dtype=pl.UInt32))
+                .alias("start_pos"),
+                pl.when(extracted.struct.field("3").is_not_null())
+                .then(extracted.struct.field("3").cast(pl.UInt32))
+                .otherwise(pl.lit(0, dtype=pl.UInt32))
+                .alias("end_pos"),
+            ])
+            expressions = [
+                pl.col("contig").cast(schema["contig"]),
+                pl.col("start_pos").cast(schema["start_pos"]),
+                pl.col("end_pos").cast(schema["end_pos"]),
+            ]
+            metric_names = ["gc_pct", "gc_skew", "a_count", "c_count", "g_count",
+                            "t_count", "n_count", "a_pct", "c_pct", "g_pct", "t_pct", "n_pct"]
+            for index, name in enumerate(metric_names, 1):
+                if index < len(cols):
+                    expressions.append(pl.col(cols[index]).cast(schema[name]).alias(name))
+                else:
+                    default = 0.0 if name.endswith("_pct") or name == "gc_skew" else 0
+                    expressions.append(pl.lit(default).cast(schema[name]).alias(name))
+            frame = frame.select(expressions)
+            arrow = frame.to_arrow()
+            if writer is None:
+                writer = pq.ParquetWriter(output_parquet, arrow.schema, compression="zstd")
+            writer.write_table(arrow)
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        pl.DataFrame(schema=schema).write_parquet(output_parquet, compression="zstd")
+
+
 def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str):
     schema = SCHEMAS[schema_name]
     out_path = Path(output_parquet)
@@ -145,77 +204,9 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
 
     if is_seqkit_gc:
         try:
-            # We first read without schema since columns are dirty
-            raw_df = pl.read_csv(input_tsv, separator="\t")
-            new_cols = [c.lower().replace('#', '').strip() for c in raw_df.columns]
-            raw_df = raw_df.rename(dict(zip(raw_df.columns, new_cols)))
-
-            # Extract contig, start, end from name (e.g., "chr1_sliding:1-1000")
-            # We use regex replace and extract
-            pattern = r'^(.*)_sliding:(\d+)-(\d+)$'
-
-            # Use `str.extract` with grouping
-            extracted = raw_df.select([
-                pl.col("name").str.extract(pattern, 1).alias("contig_ext"),
-                pl.col("name").str.extract(pattern, 2).cast(pl.UInt32).alias("start_ext"),
-                pl.col("name").str.extract(pattern, 3).cast(pl.UInt32).alias("end_ext")
-            ])
-
-            # Combine back
-            raw_df = raw_df.with_columns([
-                pl.when(extracted["contig_ext"].is_not_null())
-                  .then(extracted["contig_ext"])
-                  .otherwise(pl.col("name"))
-                  .alias("contig"),
-                pl.when(extracted["start_ext"].is_not_null())
-                  .then(extracted["start_ext"] - 1)
-                  .otherwise(pl.lit(0, dtype=pl.UInt32))
-                  .alias("start_pos"),
-                pl.when(extracted["end_ext"].is_not_null())
-                  .then(extracted["end_ext"])
-                  .otherwise(pl.lit(0, dtype=pl.UInt32))
-                  .alias("end_pos")
-            ])
-
-            if len(raw_df.columns) >= 13:
-                # all columns are present
-                cols = list(raw_df.columns)
-                df = raw_df.select([
-                    pl.col("contig").cast(schema["contig"]),
-                    pl.col("start_pos").cast(schema["start_pos"]),
-                    pl.col("end_pos").cast(schema["end_pos"]),
-                    pl.col(cols[1]).cast(schema["gc_pct"]).alias("gc_pct"),
-                    pl.col(cols[2]).cast(schema["gc_skew"]).alias("gc_skew"),
-                    pl.col(cols[3]).cast(schema["a_count"]).alias("a_count"),
-                    pl.col(cols[4]).cast(schema["c_count"]).alias("c_count"),
-                    pl.col(cols[5]).cast(schema["g_count"]).alias("g_count"),
-                    pl.col(cols[6]).cast(schema["t_count"]).alias("t_count"),
-                    pl.col(cols[7]).cast(schema["n_count"]).alias("n_count"),
-                    pl.col(cols[8]).cast(schema["a_pct"]).alias("a_pct"),
-                    pl.col(cols[9]).cast(schema["c_pct"]).alias("c_pct"),
-                    pl.col(cols[10]).cast(schema["g_pct"]).alias("g_pct"),
-                    pl.col(cols[11]).cast(schema["t_pct"]).alias("t_pct"),
-                    pl.col(cols[12]).cast(schema["n_pct"]).alias("n_pct")
-                ])
-            else:
-                cols = list(raw_df.columns)
-                df = raw_df.select([
-                    pl.col("contig").cast(schema["contig"]),
-                    pl.col("start_pos").cast(schema["start_pos"]),
-                    pl.col("end_pos").cast(schema["end_pos"]),
-                    pl.col(cols[1]).cast(schema["gc_pct"]).alias("gc_pct"),
-                    pl.col(cols[2]).cast(schema["gc_skew"]).alias("gc_skew"),
-                    pl.lit(0).cast(schema["a_count"]).alias("a_count"),
-                    pl.lit(0).cast(schema["c_count"]).alias("c_count"),
-                    pl.lit(0).cast(schema["g_count"]).alias("g_count"),
-                    pl.lit(0).cast(schema["t_count"]).alias("t_count"),
-                    pl.lit(0).cast(schema["n_count"]).alias("n_count"),
-                    pl.lit(0.0).cast(schema["a_pct"]).alias("a_pct"),
-                    pl.lit(0.0).cast(schema["c_pct"]).alias("c_pct"),
-                    pl.lit(0.0).cast(schema["g_pct"]).alias("g_pct"),
-                    pl.lit(0.0).cast(schema["t_pct"]).alias("t_pct"),
-                    pl.lit(0.0).cast(schema["n_pct"]).alias("n_pct")
-                ])
+            write_batched_seqkit_gc(input_tsv, output_parquet, schema)
+            print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
+            return
         except (KeyError, ValueError, pl.exceptions.PolarsError) as exc:
             raise SystemExit(
                 f"Error: Could not parse seqkit GC content from '{input_tsv}': {exc}"
@@ -234,9 +225,9 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                 return
             else:
                 # Fallback to standard reading
-                col_names = list(schema.keys())
-                dtypes = list(schema.values())
-                df = pl.read_csv(input_tsv, separator="\t", has_header=False, new_columns=col_names, dtypes=dtypes)
+                write_batched_csv(input_tsv, output_parquet, schema, list(schema.keys()))
+                print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
+                return
         except (ValueError, pl.exceptions.PolarsError) as exc:
             raise SystemExit(
                 f"Error: Could not parse assembly gaps from '{input_tsv}': {exc}"
