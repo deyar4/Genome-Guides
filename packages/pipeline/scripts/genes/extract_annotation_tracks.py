@@ -4,6 +4,8 @@
 import argparse
 import gzip
 import re
+import sqlite3
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 
@@ -48,15 +50,23 @@ def write_table(path, rows, columns):
 
 def parse(gtf, out_dir):
     transcripts = {}
-    exons = []
-    utrs = []
-    cds_by_tx = defaultdict(int)
-    exons_by_tx = defaultdict(list)
-    utr_by_tx = defaultdict(lambda: {"5": 0, "3": 0})
     genes = {}
     malformed_rows = 0
     open_fn = gzip.open if str(gtf).endswith(".gz") else open
-
+    database = tempfile.NamedTemporaryFile(prefix="genome-guides-annotation-", suffix=".sqlite", delete=False)
+    database.close()
+    con = sqlite3.connect(database.name)
+    con.executescript("""
+        CREATE TABLE exons (
+            tx TEXT, start INTEGER, end INTEGER, contig TEXT, strand TEXT,
+            gene TEXT, exon_number INTEGER, exon_id TEXT
+        );
+        CREATE TABLE utrs (
+            tx TEXT, start INTEGER, end INTEGER, contig TEXT, strand TEXT,
+            gene TEXT, utr_type TEXT
+        );
+        CREATE TABLE cds (tx TEXT PRIMARY KEY, bases INTEGER NOT NULL DEFAULT 0);
+    """)
     with open_fn(gtf, "rt") as handle:
         for line in handle:
             if not line.strip() or line.startswith("#"):
@@ -102,24 +112,33 @@ def parse(gtf, out_dir):
                     "exon_number": int(a["exon_number"]) if a.get("exon_number", "").isdigit() else None,
                     "exon_id": a.get("exon_id") or f"{tx}:{start0}-{end0}",
                 }
-                exons.append(row)
-                exons_by_tx[tx].append((start0, end0, chrom, strand, gene))
+                con.execute(
+                    "INSERT INTO exons VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (tx, start0, end0, chrom, strand, gene, row["exon_number"], row["exon_id"]),
+                )
             elif feature.lower() in {"5utr", "3utr", "utr"} and tx:
                 side = "5" if feature.lower() == "5utr" else "3" if feature.lower() == "3utr" else "unknown"
-                utrs.append({
-                    "contig": chrom, "start_pos": start0, "end_pos": end0,
-                    "strand": strand, "transcript_id": tx, "gene_id": gene,
-                    "utr_type": side,
-                })
-                if side in {"5", "3"}:
-                    utr_by_tx[tx][side] += end0 - start0
+                con.execute(
+                    "INSERT INTO utrs VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (tx, start0, end0, chrom, strand, gene, side),
+                )
             elif feature == "CDS" and tx:
-                cds_by_tx[tx] += end0 - start0
+                con.execute(
+                    "INSERT INTO cds(tx, bases) VALUES (?, ?) "
+                    "ON CONFLICT(tx) DO UPDATE SET bases = bases + excluded.bases",
+                    (tx, end0 - start0),
+                )
+    con.commit()
 
     introns = []
     architectures = []
-    for tx, tx_exons in exons_by_tx.items():
-        ordered = sorted(tx_exons)
+    for tx in transcripts:
+        ordered = con.execute(
+            "SELECT start, end, contig, strand, gene FROM exons "
+            "WHERE tx = ? ORDER BY start, end", (tx,)
+        ).fetchall()
+        if not ordered:
+            continue
         for number, (left, right) in enumerate(zip(ordered, ordered[1:]), 1):
             if right[0] > left[1]:
                 introns.append({
@@ -136,8 +155,15 @@ def parse(gtf, out_dir):
             "exon_count": len(ordered), "intron_count": max(0, len(ordered) - 1),
             "exon_bases": sum(e[1] - e[0] for e in ordered),
             "intron_bases": sum(r[0] - l[1] for l, r in zip(ordered, ordered[1:])),
-            "utr5_bases": utr_by_tx[tx]["5"], "utr3_bases": utr_by_tx[tx]["3"],
-            "cds_bases": cds_by_tx[tx],
+            "utr5_bases": con.execute(
+                "SELECT COALESCE(SUM(end - start), 0) FROM utrs WHERE tx = ? AND utr_type = '5'", (tx,)
+            ).fetchone()[0],
+            "utr3_bases": con.execute(
+                "SELECT COALESCE(SUM(end - start), 0) FROM utrs WHERE tx = ? AND utr_type = '3'", (tx,)
+            ).fetchone()[0],
+            "cds_bases": (con.execute(
+                "SELECT COALESCE(bases, 0) FROM cds WHERE tx = ?", (tx,)
+            ).fetchone() or (0,))[0],
         })
 
     out = Path(out_dir)
@@ -165,7 +191,12 @@ def parse(gtf, out_dir):
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("gene_name", pa.string()), ("biotype", pa.string()),
     ])
-    write_table(out / "exons.parquet", exons, [
+    exon_rows = [{
+        "contig": row[3], "start_pos": row[1], "end_pos": row[2],
+        "strand": row[4], "transcript_id": row[0], "gene_id": row[5],
+        "exon_number": row[6], "exon_id": row[7],
+    } for row in con.execute("SELECT tx, start, end, contig, strand, gene, exon_number, exon_id FROM exons")]
+    write_table(out / "exons.parquet", exon_rows, [
         ("contig", pa.string()), ("start_pos", pa.uint64()), ("end_pos", pa.uint64()),
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("exon_number", pa.uint32()), ("exon_id", pa.string()),
@@ -175,7 +206,11 @@ def parse(gtf, out_dir):
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("intron_number", pa.uint32()),
     ])
-    write_table(out / "utrs.parquet", utrs, [
+    utr_rows = [{
+        "contig": row[3], "start_pos": row[1], "end_pos": row[2],
+        "strand": row[4], "transcript_id": row[0], "gene_id": row[5], "utr_type": row[6],
+    } for row in con.execute("SELECT tx, start, end, contig, strand, gene, utr_type FROM utrs")]
+    write_table(out / "utrs.parquet", utr_rows, [
         ("contig", pa.string()), ("start_pos", pa.uint64()), ("end_pos", pa.uint64()),
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("utr_type", pa.string()),
@@ -188,6 +223,8 @@ def parse(gtf, out_dir):
     ])
     if malformed_rows:
         print(f"Warning: skipped {malformed_rows} malformed annotation rows.", file=sys.stderr)
+    con.close()
+    Path(database.name).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
