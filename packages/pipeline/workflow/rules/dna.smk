@@ -173,7 +173,7 @@ rule compute_genomic_homopolymers:
     input:
         fasta="data/raw/{genome}.fa"
     output:
-        bed="data/interim/{genome}/homopolymers.bed"
+        bed=temp("data/interim/{genome}/homopolymers.bed")
     log:
         "logs/{genome}/compute_genomic_homopolymers.log"
     threads: config["resources"]["analytical"]["threads"]

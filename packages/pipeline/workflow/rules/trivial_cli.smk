@@ -21,7 +21,7 @@ rule compute_gc_and_skew:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        tsv="data/interim/{genome}/gc_skew.tsv"
+        tsv=temp("data/interim/{genome}/gc_skew.tsv")
     params:
         window=1000,
         step=1000
@@ -42,7 +42,7 @@ rule extract_assembly_gaps:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        bed="data/interim/{genome}/assembly_gaps.bed"
+        bed=temp("data/interim/{genome}/assembly_gaps.bed")
     log:
         "logs/{genome}/extract_assembly_gaps.log"
     threads: 1
