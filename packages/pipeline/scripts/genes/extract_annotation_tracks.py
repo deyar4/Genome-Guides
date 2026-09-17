@@ -48,6 +48,26 @@ def write_table(path, rows, columns):
         pq.write_table(pa.Table.from_pylist([], schema=schema), path, compression="zstd")
 
 
+def write_cursor_table(path, cursor, columns):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    writer = None
+    try:
+        while rows := cursor.fetchmany(65536):
+            table = pa.Table.from_pylist([dict(row) for row in rows], schema=pa.schema([
+                pa.field(name, kind) for name, kind in columns
+            ]))
+            if writer is None:
+                writer = pq.ParquetWriter(path, table.schema, compression="zstd")
+            writer.write_table(table)
+    finally:
+        if writer is not None:
+            writer.close()
+    if writer is None:
+        pq.write_table(pa.Table.from_pylist([], schema=pa.schema([
+            pa.field(name, kind) for name, kind in columns
+        ])), path, compression="zstd")
+
+
 def parse(gtf, out_dir):
     transcripts = {}
     genes = {}
@@ -56,6 +76,7 @@ def parse(gtf, out_dir):
     database = tempfile.NamedTemporaryFile(prefix="genome-guides-annotation-", suffix=".sqlite", delete=False)
     database.close()
     con = sqlite3.connect(database.name)
+    con.row_factory = sqlite3.Row
     con.executescript("""
         CREATE TABLE exons (
             tx TEXT, start INTEGER, end INTEGER, contig TEXT, strand TEXT,
@@ -191,12 +212,12 @@ def parse(gtf, out_dir):
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("gene_name", pa.string()), ("biotype", pa.string()),
     ])
-    exon_rows = [{
-        "contig": row[3], "start_pos": row[1], "end_pos": row[2],
-        "strand": row[4], "transcript_id": row[0], "gene_id": row[5],
-        "exon_number": row[6], "exon_id": row[7],
-    } for row in con.execute("SELECT tx, start, end, contig, strand, gene, exon_number, exon_id FROM exons")]
-    write_table(out / "exons.parquet", exon_rows, [
+    exon_cursor = con.execute("""
+        SELECT contig, start AS start_pos, end AS end_pos, strand,
+               tx AS transcript_id, gene AS gene_id, exon_number, exon_id
+        FROM exons ORDER BY rowid
+    """)
+    write_cursor_table(out / "exons.parquet", exon_cursor, [
         ("contig", pa.string()), ("start_pos", pa.uint64()), ("end_pos", pa.uint64()),
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("exon_number", pa.uint32()), ("exon_id", pa.string()),
@@ -206,11 +227,12 @@ def parse(gtf, out_dir):
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("intron_number", pa.uint32()),
     ])
-    utr_rows = [{
-        "contig": row[3], "start_pos": row[1], "end_pos": row[2],
-        "strand": row[4], "transcript_id": row[0], "gene_id": row[5], "utr_type": row[6],
-    } for row in con.execute("SELECT tx, start, end, contig, strand, gene, utr_type FROM utrs")]
-    write_table(out / "utrs.parquet", utr_rows, [
+    utr_cursor = con.execute("""
+        SELECT contig, start AS start_pos, end AS end_pos, strand,
+               tx AS transcript_id, gene AS gene_id, utr_type
+        FROM utrs ORDER BY rowid
+    """)
+    write_cursor_table(out / "utrs.parquet", utr_cursor, [
         ("contig", pa.string()), ("start_pos", pa.uint64()), ("end_pos", pa.uint64()),
         ("strand", pa.string()), ("transcript_id", pa.string()), ("gene_id", pa.string()),
         ("utr_type", pa.string()),
