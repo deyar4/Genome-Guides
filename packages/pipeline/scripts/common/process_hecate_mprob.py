@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-import sys
 import argparse
+from pathlib import Path
 import numpy as np
-import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
 
-def process_mprob(fai_path, xz_path, out_path, window_size=1000):
+def process_mprob(fai_path, xz_path, out_path, window_size=1000, chunk_windows=1000):
+    if window_size < 1:
+        raise ValueError("window size must be at least 1")
+    if chunk_windows < 1:
+        raise ValueError("chunk windows must be at least 1")
+
     contigs = []
     with open(fai_path, 'r') as f:
         for line in f:
@@ -12,16 +18,6 @@ def process_mprob(fai_path, xz_path, out_path, window_size=1000):
             if parts:
                 contigs.append((parts[0], int(parts[1])))
                 
-    schema = {
-        "contig": pl.Utf8,
-        "start_pos": pl.UInt32,
-        "end_pos": pl.UInt32,
-        "mean_prob": pl.Float32,
-        "min_prob": pl.Float32,
-        "max_prob": pl.Float32,
-        "mean_entropy": pl.Float32
-    }
-
     # Polars read_csv_batched does not support .xz files natively.
     # We use pandas C-engine to stream the .xz in chunks, then process the numpy arrays.
     import pandas as pd
@@ -30,92 +26,102 @@ def process_mprob(fai_path, xz_path, out_path, window_size=1000):
             xz_path, 
             header=None, 
             names=['prob'], 
-            chunksize=window_size * 5000,
+                chunksize=window_size * chunk_windows,
             engine='c'
         )
-    except Exception as e:
-        print(f"Error opening batched reader via pandas: {e}")
-        raise
+    except (OSError, ValueError, pd.errors.ParserError) as exc:
+        raise SystemExit(f"Error: Cannot read Hecate probability stream '{xz_path}': {exc}") from exc
 
     contig_idx = 0
     pos_in_contig = 0
+    pending_p = np.empty(0, dtype=float)
+    pending_e = np.empty(0, dtype=float)
     
-    df_chunks = []
-    
-    for chunk in chunk_iterator:
-        probs = chunk['prob'].to_numpy()
-        
-        # Vectorized entropy calculation
-        with np.errstate(divide='ignore'):
-            entropies = -np.log2(probs)
-        entropies = np.clip(entropies, 0, 20.0)
-        
-        chunk_pos = 0
-        chunk_len = len(probs)
-        
-        records = {
-            "contig": [], "start_pos": [], "end_pos": [],
-            "mean_prob": [], "min_prob": [], "max_prob": [], "mean_entropy": []
-        }
-        
-        while chunk_pos < chunk_len:
-            if contig_idx >= len(contigs):
-                break
-                
-            current_contig, current_contig_len = contigs[contig_idx]
-            remaining_in_contig = current_contig_len - pos_in_contig
-            
-            # Determine how much of the chunk belongs to the current contig
-            take = min(chunk_len - chunk_pos, remaining_in_contig)
-            
-            p_slice = probs[chunk_pos:chunk_pos+take]
-            e_slice = entropies[chunk_pos:chunk_pos+take]
-            
-            remainder = take % window_size
-            pad = (window_size - remainder) if remainder else 0
-            
-            if pad:
-                p_slice = np.pad(p_slice, (0, pad), constant_values=np.nan)
-                e_slice = np.pad(e_slice, (0, pad), constant_values=np.nan)
-                
-            p_2d = p_slice.reshape(-1, window_size)
-            e_2d = e_slice.reshape(-1, window_size)
-            
-            mean_p = np.nanmean(p_2d, axis=1)
-            min_p = np.nanmin(p_2d, axis=1)
-            max_p = np.nanmax(p_2d, axis=1)
-            mean_e = np.nanmean(e_2d, axis=1)
-            
-            num_windows = len(mean_p)
-            starts = pos_in_contig + np.arange(num_windows) * window_size
-            ends = starts + window_size
-            if remainder:
-                ends[-1] = pos_in_contig + take
-                
-            records["contig"].extend([current_contig] * num_windows)
-            records["start_pos"].extend(starts)
-            records["end_pos"].extend(ends)
-            records["mean_prob"].extend(mean_p)
-            records["min_prob"].extend(min_p)
-            records["max_prob"].extend(max_p)
-            records["mean_entropy"].extend(mean_e)
-            
-            chunk_pos += take
-            pos_in_contig += take
-            
-            if pos_in_contig >= current_contig_len:
-                contig_idx += 1
-                pos_in_contig = 0
-                
-        if records["contig"]:
-            df_chunk = pl.DataFrame(records, schema=schema)
-            df_chunks.append(df_chunk)
+    arrow_schema = pa.schema([
+        ("contig", pa.string()),
+        ("start_pos", pa.uint32()),
+        ("end_pos", pa.uint32()),
+        ("mean_prob", pa.float32()),
+        ("min_prob", pa.float32()),
+        ("max_prob", pa.float32()),
+        ("mean_entropy", pa.float32()),
+    ])
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    writer = pq.ParquetWriter(out_path, arrow_schema, compression="zstd")
 
-    if df_chunks:
-        final_df = pl.concat(df_chunks)
-        final_df.write_parquet(out_path, compression='zstd')
-    else:
-        pl.DataFrame(schema=schema).write_parquet(out_path, compression='zstd')
+    try:
+        for chunk in chunk_iterator:
+            probs = chunk["prob"].to_numpy()
+
+            # Vectorized entropy keeps the per-batch calculation in NumPy.
+            with np.errstate(divide="ignore"):
+                entropies = -np.log2(probs)
+            entropies = np.clip(entropies, 0, 20.0)
+
+            chunk_pos = 0
+            chunk_len = len(probs)
+            records = {
+                "contig": [], "start_pos": [], "end_pos": [],
+                "mean_prob": [], "min_prob": [], "max_prob": [], "mean_entropy": []
+            }
+
+            while chunk_pos < chunk_len:
+                if contig_idx >= len(contigs):
+                    raise ValueError("Probability stream contains more bases than the FASTA index")
+
+                current_contig, current_contig_len = contigs[contig_idx]
+                remaining_in_contig = current_contig_len - pos_in_contig
+                take = min(chunk_len - chunk_pos, remaining_in_contig)
+
+                p_slice = np.concatenate((pending_p, probs[chunk_pos:chunk_pos + take]))
+                e_slice = np.concatenate((pending_e, entropies[chunk_pos:chunk_pos + take]))
+                window_start = pos_in_contig - len(pending_p)
+                reaches_contig_end = pos_in_contig + take >= current_contig_len
+                window_count = len(p_slice) // window_size
+                if reaches_contig_end and len(p_slice) % window_size:
+                    window_count += 1
+                used = window_count * window_size
+                if reaches_contig_end and used > len(p_slice):
+                    pad = used - len(p_slice)
+                    p_slice = np.pad(p_slice, (0, pad), constant_values=np.nan)
+                    e_slice = np.pad(e_slice, (0, pad), constant_values=np.nan)
+
+                p_2d = p_slice[:used].reshape(-1, window_size)
+                e_2d = e_slice[:used].reshape(-1, window_size)
+                mean_p = np.nanmean(p_2d, axis=1)
+                min_p = np.nanmin(p_2d, axis=1)
+                max_p = np.nanmax(p_2d, axis=1)
+                mean_e = np.nanmean(e_2d, axis=1)
+
+                num_windows = len(mean_p)
+                starts = window_start + np.arange(num_windows) * window_size
+                ends = starts + window_size
+                if reaches_contig_end and num_windows:
+                    ends[-1] = current_contig_len
+
+                records["contig"].extend([current_contig] * num_windows)
+                records["start_pos"].extend(starts)
+                records["end_pos"].extend(ends)
+                records["mean_prob"].extend(mean_p)
+                records["min_prob"].extend(min_p)
+                records["max_prob"].extend(max_p)
+                records["mean_entropy"].extend(mean_e)
+
+                chunk_pos += take
+                pos_in_contig += take
+                if reaches_contig_end:
+                    pending_p = np.empty(0, dtype=float)
+                    pending_e = np.empty(0, dtype=float)
+                    contig_idx += 1
+                    pos_in_contig = 0
+                else:
+                    pending_p = p_slice[used:]
+                    pending_e = e_slice[used:]
+
+            if records["contig"]:
+                writer.write_table(pa.table(records, schema=arrow_schema))
+    finally:
+        writer.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -123,5 +129,11 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", required=True)
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("-w", "--window", type=int, default=1000)
+    parser.add_argument(
+        "--chunk-windows",
+        type=int,
+        default=1000,
+        help="Maximum windows buffered per input batch (default: 1000)",
+    )
     args = parser.parse_args()
-    process_mprob(args.fai, args.input, args.output, args.window)
+    process_mprob(args.fai, args.input, args.output, args.window, args.chunk_windows)
