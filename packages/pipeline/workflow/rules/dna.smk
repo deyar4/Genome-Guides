@@ -5,7 +5,12 @@ rule compute_cpg_islands:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        parquet="data/tracks/{genome}/all/cpg_islands.parquet"
+        parquet="data/tracks/{genome}/all/cpg_islands.parquet",
+        windows=temp("data/interim/{genome}/cpg_windows.bed"),
+        nuc=temp("data/interim/{genome}/cpg_nuc.bed"),
+        locs=temp("data/interim/{genome}/cpg_locs.bed"),
+        mapped=temp("data/interim/{genome}/cpg_mapped.bed"),
+        tsv=temp("data/interim/{genome}/cpg_islands.tsv")
     log:
         "logs/{genome}/compute_cpg_islands.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -15,23 +20,22 @@ rule compute_cpg_islands:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        bedtools makewindows -g {input.fai} -w 200 -s 200 | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/cpg_windows.bed
-        bedtools nuc -fi {input.fasta} -bed data/interim/{wildcards.genome}/cpg_windows.bed | grep -v "^#" > data/interim/{wildcards.genome}/cpg_nuc.bed
-        seqkit locate -i -P -p "CG" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/cpg_locs.bed
-        if [ ! -s data/interim/{wildcards.genome}/cpg_locs.bed ]; then
-            awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' data/interim/{wildcards.genome}/cpg_nuc.bed
+        bedtools makewindows -g {input.fai} -w 200 -s 200 | sort -k1,1 -k2,2n > {output.windows}
+        bedtools nuc -fi {input.fasta} -bed {output.windows} | grep -v "^#" > {output.nuc}
+        seqkit locate -i -P -p "CG" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
+        if [ ! -s {output.locs} ]; then
+            awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' {output.nuc}
         else
-            bedtools map -a data/interim/{wildcards.genome}/cpg_nuc.bed -b data/interim/{wildcards.genome}/cpg_locs.bed -c 4 -o count -null 0
-        fi > data/interim/{wildcards.genome}/cpg_mapped.bed
+            bedtools map -a {output.nuc} -b {output.locs} -c 4 -o count -null 0
+        fi > {output.mapped}
         awk 'BEGIN {{OFS="\\t"}} {{
             gc_pct = $5 * 100.0;
             expected = ($7 * $8) / $12;
             ratio = (expected > 0) ? ($13 / expected) : 0.0;
             is_island = (gc_pct >= 50.0 && ratio >= 0.60 && $13 >= 4.0) ? 1 : 0;
             if (is_island == 1) print $1, $2, $3, gc_pct, ratio, $13, is_island
-        }}' data/interim/{wildcards.genome}/cpg_mapped.bed > data/interim/{wildcards.genome}/cpg_islands.tsv
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/interim/{wildcards.genome}/cpg_islands.tsv -o {output.parquet} -t cpg_islands
-        rm -f data/interim/{wildcards.genome}/cpg_windows.bed data/interim/{wildcards.genome}/cpg_nuc.bed data/interim/{wildcards.genome}/cpg_locs.bed data/interim/{wildcards.genome}/cpg_mapped.bed data/interim/{wildcards.genome}/cpg_islands.tsv
+        }}' {output.mapped} > {output.tsv}
+        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t cpg_islands
         """
 
 rule compute_ssrs:
@@ -118,7 +122,12 @@ rule compute_shannon_entropy:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        parquet="data/tracks/{genome}/all/shannon_entropy.parquet"
+        parquet="data/tracks/{genome}/all/shannon_entropy.parquet",
+        windows=temp("data/interim/{genome}/entropy_windows.bed"),
+        nuc=temp("data/interim/{genome}/entropy_nuc.bed"),
+        locs=temp("data/interim/{genome}/entropy_locs.bed"),
+        mapped=temp("data/interim/{genome}/entropy_mapped.bed"),
+        tsv=temp("data/interim/{genome}/entropy.tsv")
     log:
         "logs/{genome}/compute_shannon_entropy.log"
     threads: config["resources"]["analytical"]["threads"]
@@ -128,14 +137,14 @@ rule compute_shannon_entropy:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        bedtools makewindows -g {input.fai} -w 1000 -s 1000 | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/entropy_windows.bed
-        bedtools nuc -fi {input.fasta} -bed data/interim/{wildcards.genome}/entropy_windows.bed | grep -v "^#" > data/interim/{wildcards.genome}/entropy_nuc.bed
-        seqkit locate -i -r -p "TTAGGG|CCCTAA" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/entropy_locs.bed
-        if [ ! -s data/interim/{wildcards.genome}/entropy_locs.bed ]; then
-            awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' data/interim/{wildcards.genome}/entropy_nuc.bed
+        bedtools makewindows -g {input.fai} -w 1000 -s 1000 | sort -k1,1 -k2,2n > {output.windows}
+        bedtools nuc -fi {input.fasta} -bed {output.windows} | grep -v "^#" > {output.nuc}
+        seqkit locate -i -r -p "TTAGGG|CCCTAA" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
+        if [ ! -s {output.locs} ]; then
+            awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' {output.nuc}
         else
-            bedtools map -a data/interim/{wildcards.genome}/entropy_nuc.bed -b data/interim/{wildcards.genome}/entropy_locs.bed -c 4 -o count -null 0
-        fi > data/interim/{wildcards.genome}/entropy_mapped.bed
+            bedtools map -a {output.nuc} -b {output.locs} -c 4 -o count -null 0
+        fi > {output.mapped}
         awk 'BEGIN {{OFS="\\t"; log2=log(2)}} {{
             na=$6; nc=$7; ng=$8; nt=$9;
             tot = na + nc + ng + nt;
@@ -147,9 +156,8 @@ rule compute_shannon_entropy:
                 pt = nt / tot; if (pt > 0) entropy -= pt * log(pt)/log2;
             }}
             print $1, $2, $3, entropy, $13
-        }}' data/interim/{wildcards.genome}/entropy_mapped.bed > data/interim/{wildcards.genome}/entropy.tsv
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/interim/{wildcards.genome}/entropy.tsv -o {output.parquet} -t shannon_entropy
-        rm -f data/interim/{wildcards.genome}/entropy_windows.bed data/interim/{wildcards.genome}/entropy_nuc.bed data/interim/{wildcards.genome}/entropy_locs.bed data/interim/{wildcards.genome}/entropy_mapped.bed data/interim/{wildcards.genome}/entropy.tsv
+        }}' {output.mapped} > {output.tsv}
+        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t shannon_entropy
         """
 
 rule compute_dinucleotides:
@@ -217,7 +225,9 @@ rule compute_hecate_mprob:
         fasta="data/raw/{genome}.fa",
         fai="data/raw/{genome}.fa.fai"
     output:
-        parquet="data/tracks/{genome}/all/hecate_mprob.parquet"
+        parquet="data/tracks/{genome}/all/hecate_mprob.parquet",
+        he=temp("data/interim/{genome}/temp.he"),
+        mprob=temp("data/interim/{genome}/mprob.xz")
     log:
         "logs/{genome}/compute_hecate_mprob.log"
     threads: config["resources"]["hecate"]["threads"]
@@ -229,10 +239,8 @@ rule compute_hecate_mprob:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        rm -f data/interim/{wildcards.genome}/temp.he data/interim/{wildcards.genome}/mprob.xz
-        packages/hecate/target/release/hecate --force -e -M markov --mprob data/interim/{wildcards.genome}/mprob.xz {input.fasta} -o data/interim/{wildcards.genome}/temp.he
+        packages/hecate/target/release/hecate --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
-            -f {input.fai} -i data/interim/{wildcards.genome}/mprob.xz \
+            -f {input.fai} -i {output.mprob} \
             -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows}
-        rm -f data/interim/{wildcards.genome}/mprob.xz data/interim/{wildcards.genome}/temp.he
         """
