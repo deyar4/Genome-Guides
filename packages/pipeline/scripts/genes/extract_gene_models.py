@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 from collections import defaultdict
 import polars as pl
+import pyarrow as pa
+import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
 from resource_args import add_resource_args
 
@@ -34,7 +36,13 @@ def run_parser(input_path: str, out_dir: str):
     out_p = Path(out_dir)
     out_p.mkdir(parents=True, exist_ok=True)
 
-    genes_data = []
+    gene_schema = {
+        "contig": pa.string(), "start_pos": pa.uint32(), "end_pos": pa.uint32(),
+        "strand": pa.string(), "gene_id": pa.string(), "gene_name": pa.string(),
+        "biotype": pa.string(),
+    }
+    gene_writer = None
+    gene_count = 0
     seen_genes = set()
     biotype_counts = defaultdict(int)
     gene_density_windows = defaultdict(int)
@@ -74,30 +82,32 @@ def run_parser(input_path: str, out_dir: str):
                 transcript_id = attrs.get("transcript_id", "N/A")
                 biotype = attrs.get("gene_biotype") or attrs.get("gene_type") or attrs.get("gbkey") or ("protein_coding" if transcript_id.startswith("NM_") or transcript_id.startswith("XM_") else "non_coding")
 
-                genes_data.append((contig, start, end, strand, gene_id, gene_name, biotype))
+                row = {
+                    "contig": contig, "start_pos": start, "end_pos": end,
+                    "strand": strand, "gene_id": gene_id, "gene_name": gene_name,
+                    "biotype": biotype,
+                }
+                table = pa.Table.from_pylist([row], schema=pa.schema([
+                    pa.field(name, dtype) for name, dtype in gene_schema.items()
+                ]))
+                if gene_writer is None:
+                    gene_writer = pq.ParquetWriter(
+                        out_p / "gene_models.parquet", table.schema, compression="zstd"
+                    )
+                gene_writer.write_table(table)
+                gene_count += 1
                 biotype_counts[biotype] += 1
 
                 w_idx = start // window_size
                 gene_density_windows[(contig, w_idx * window_size)] += 1
 
     # 1. Write Gene Models Parquet
-    gene_schema = {
-        "contig": pl.Utf8,
-        "start_pos": pl.UInt32,
-        "end_pos": pl.UInt32,
-        "strand": pl.Utf8,
-        "gene_id": pl.Utf8,
-        "gene_name": pl.Utf8,
-        "biotype": pl.Utf8
-    }
-    
-    if genes_data:
-        gene_df = pl.DataFrame(genes_data, schema=gene_schema, orient="row")
+    if gene_writer is not None:
+        gene_writer.close()
     else:
-        gene_df = pl.DataFrame(schema=gene_schema)
-
-    gene_df.write_parquet(out_p / "gene_models.parquet", compression="zstd")
-    print(f"Created gene_models.parquet with {len(genes_data)} genes.")
+        empty_schema = pa.schema([pa.field(name, dtype) for name, dtype in gene_schema.items()])
+        pq.write_table(pa.Table.from_pylist([], schema=empty_schema), out_p / "gene_models.parquet", compression="zstd")
+    print(f"Created gene_models.parquet with {gene_count} genes.")
 
     # 2. Write Gene Density Parquet
     density_schema = {
