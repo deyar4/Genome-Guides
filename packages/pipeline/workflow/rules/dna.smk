@@ -223,12 +223,16 @@ rule compute_hecate_mprob:
     threads: config["resources"]["hecate"]["threads"]
     resources:
         mem_mb=config["resources"]["hecate"]["mem_mb"]
+    params:
+        chunk_windows=config["tracks"]["hecate_bwt"]["chunk_windows"]
     shell:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         rm -f data/interim/{wildcards.genome}/temp.he data/interim/{wildcards.genome}/mprob.xz
         packages/hecate/target/release/hecate --force -e -M markov --mprob data/interim/{wildcards.genome}/mprob.xz {input.fasta} -o data/interim/{wildcards.genome}/temp.he
-        python3 packages/pipeline/scripts/common/process_hecate_mprob.py -f {input.fai} -i data/interim/{wildcards.genome}/mprob.xz -o {output.parquet} -w 1000
+        python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
+            -f {input.fai} -i data/interim/{wildcards.genome}/mprob.xz \
+            -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows}
         rm -f data/interim/{wildcards.genome}/mprob.xz data/interim/{wildcards.genome}/temp.he
         """

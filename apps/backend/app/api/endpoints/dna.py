@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
+import duckdb
 from typing import List, Optional
 from pathlib import Path
 from app.api.dependencies import get_track_service
@@ -161,12 +162,8 @@ def get_dinucleotides(
             base_frequencies={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
             dinucleotides=dinucs
         )
-    except Exception as e:
-        return GenomeDinucleotides(
-            total_dinucleotides=0,
-            base_frequencies={"A": 0.3, "C": 0.2, "G": 0.2, "T": 0.3},
-            dinucleotides=[]
-        )
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query dinucleotide track: {exc}") from exc
 
 @router.get("/telomeres", response_model=List[TelomereHit])
 def get_telomeres(
@@ -256,8 +253,8 @@ def get_gaps(
                 gap_type=r.get("gap_type", "N")
             ))
         return gaps
-    except Exception:
-        return []
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query assembly gaps: {exc}") from exc
 
 @router.get("/cpg-islands", response_model=List[CpGIslandHit])
 def get_cpg_islands(
@@ -283,8 +280,8 @@ def get_cpg_islands(
                 obs_exp_ratio=float(r.get("obs_exp_ratio", 0))
             ))
         return islands
-    except Exception:
-        return []
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query CpG islands: {exc}") from exc
 
 @router.get("/stats/{chrom}/kmers", response_model=KmerResponse)
 def get_kmers(
@@ -303,8 +300,8 @@ def get_kmers(
         for r in res:
             kmers.append(KmerFrequency(kmer=r.get("kmer",""), count=int(r.get("count",0)), frequency=float(r.get("frequency",0))))
         return KmerResponse(k=k, total_kmers=sum([x.count for x in kmers]), unique_kmers=len(kmers), kmers=kmers)
-    except Exception:
-        return KmerResponse(k=k, total_kmers=0, unique_kmers=0, kmers=[])
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query k-mer track: {exc}") from exc
 
 @router.get("/ssr", response_model=List[SSRHit])
 def get_ssr(

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+import duckdb
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
 from app.schemas.track import TrackDataResponse
@@ -38,5 +39,5 @@ def get_track_data(
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to query track: {str(e)}")
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query track: {exc}") from exc

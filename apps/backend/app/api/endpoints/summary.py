@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import duckdb
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
 from app.schemas.track import SummaryResponse
@@ -29,5 +30,5 @@ def get_global_summary(
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to query summary: {str(e)}")
+    except (duckdb.Error, OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query summary: {exc}") from exc

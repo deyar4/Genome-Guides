@@ -34,6 +34,7 @@ tracks:
     enabled: false
     kmer_length: 21
     window_size: 100
+    chunk_windows: 1000
   ssr:
     enabled: true
     window_size: 1000000
