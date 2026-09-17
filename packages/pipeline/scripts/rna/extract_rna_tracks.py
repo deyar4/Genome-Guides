@@ -4,6 +4,8 @@
 import argparse
 import gzip
 import re
+import sqlite3
+import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -116,11 +118,16 @@ class ParquetRowWriter:
 
 
 def extract(gtf, fasta, out_dir):
-    exons = defaultdict(list)
     transcripts = {}
     ncrna = Counter()
     malformed_rows = 0
     open_fn = gzip.open if str(gtf).endswith(".gz") else open
+    database = tempfile.NamedTemporaryFile(prefix="genome-guides-rna-", suffix=".sqlite", delete=False)
+    database.close()
+    con = sqlite3.connect(database.name)
+    con.execute(
+        "CREATE TABLE exons (tx TEXT, start INTEGER, end INTEGER, contig TEXT, strand TEXT, gene TEXT)"
+    )
     with open_fn(gtf, "rt") as handle:
         for line in handle:
             if not line.strip() or line.startswith("#"):
@@ -149,7 +156,9 @@ def extract(gtf, fasta, out_dir):
                 if biotype != "protein_coding":
                     ncrna[biotype] += 1
             else:
-                exons[tx].append((start0, end0, chrom, strand, gene))
+                con.execute("INSERT INTO exons VALUES (?, ?, ?, ?, ?, ?)",
+                            (tx, start0, end0, chrom, strand, gene))
+    con.commit()
 
     fa = FastaIndex(fasta)
     out = Path(out_dir)
@@ -163,8 +172,11 @@ def extract(gtf, fasta, out_dir):
     junction_writer = ParquetRowWriter(out / "splice_sites.parquet", junction_schema)
     donor_counts, acceptor_counts = Counter(), Counter()
     pwm_counts = {"donor": [Counter() for _ in range(2)], "acceptor": [Counter() for _ in range(2)]}
-    for tx, parts in exons.items():
-        parts.sort()
+    for (tx,) in con.execute("SELECT DISTINCT tx FROM exons"):
+        parts = con.execute(
+            "SELECT start, end, contig, strand, gene FROM exons "
+            "WHERE tx = ? ORDER BY start, end", (tx,)
+        ).fetchall()
         info = transcripts.get(tx)
         if not info:
             continue
@@ -265,6 +277,8 @@ def extract(gtf, fasta, out_dir):
     })
     if malformed_rows:
         print(f"Warning: skipped {malformed_rows} malformed annotation rows.", file=sys.stderr)
+    con.close()
+    Path(database.name).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
