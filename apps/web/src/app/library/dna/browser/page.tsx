@@ -1,5 +1,5 @@
 "use client"
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { LibraryShell } from "@/components/layout/library-shell";
 import { useGenomeStore } from "@/store/use-genome-store";
 import { useGenomeData, genomeLengths } from "@/hooks/useGenomeData";
@@ -22,28 +22,22 @@ const DEFAULT_TRACKS: TrackConfig[] = [
 
 export default function GenomeBrowserPage() {
   const { activeGenome } = useGenomeStore();
+  return <GenomeBrowser key={activeGenome} activeGenome={activeGenome} />;
+}
+
+function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLengths }) {
   const { theme } = useTheme();
   
   const availableContigs = Object.keys(genomeLengths[activeGenome] || {});
+  const initialContig = availableContigs[0] || "chr1";
+  const initialEnd = Math.min(100000, genomeLengths[activeGenome]?.[initialContig] || 100000);
   
-  const [selectedContig, setSelectedContig] = useState<string>("chr1");
+  const [selectedContig, setSelectedContig] = useState<string>(initialContig);
   const [startPos, setStartPos] = useState<number>(0);
-  const [endPos, setEndPos] = useState<number>(100000);
+  const [endPos, setEndPos] = useState<number>(initialEnd);
   const [hoverCoord, setHoverCoord] = useState<number | null>(null);
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [tracks, setTracks] = useState<TrackConfig[]>(DEFAULT_TRACKS);
-
-  // Sync contig when genome changes
-  useEffect(() => {
-    if (availableContigs.length > 0 && !availableContigs.includes(selectedContig)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelectedContig(availableContigs[0]);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStartPos(0);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setEndPos(Math.min(100000, genomeLengths[activeGenome][availableContigs[0]]));
-    }
-  }, [activeGenome, availableContigs, selectedContig]);
 
   const { currentMaxLen, loading, data } = useGenomeData(
     activeGenome,
