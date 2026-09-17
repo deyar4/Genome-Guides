@@ -12,6 +12,8 @@ import re
 from pathlib import Path
 import polars as pl
 import math
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -26,20 +28,40 @@ def analyze_proteins(input_path: str, out_dir: str):
     out_p.mkdir(parents=True, exist_ok=True)
 
     total_aa_counts = {aa: 0 for aa in AMINO_ACIDS}
-    homopolymers = []
-    lengths = []
-    per_protein_composition = []
-    richness = []
     homo_regex = re.compile(r'([ACDEFGHIKLMNPQRSTVWY])\1{4,}')
 
     open_fn = gzip.open if input_path.endswith(".gz") else open
 
     current_id = None
     seq_chunks = []
+    schemas = {
+        "homopolymers": pa.schema([
+            ("protein_id", pa.string()), ("amino_acid", pa.string()),
+            ("repeat_len", pa.uint32()), ("start_pos", pa.uint32()), ("end_pos", pa.uint32()),
+        ]),
+        "lengths": pa.schema([("protein_id", pa.string()), ("length", pa.uint32())]),
+        "composition": pa.schema([
+            ("protein_id", pa.string()), ("amino_acid", pa.string()),
+            ("count", pa.uint32()), ("frequency_pct", pa.float32()),
+        ]),
+        "richness": pa.schema([
+            ("protein_id", pa.string()), ("length", pa.uint32()),
+            ("distinct_amino_acids", pa.uint8()), ("dominant_amino_acid", pa.string()),
+            ("dominant_frequency_pct", pa.float32()), ("shannon_entropy", pa.float32()),
+        ]),
+    }
+    writers = {
+        name: pq.ParquetWriter(out_p / f"protein_{name}.parquet", schema, compression="zstd")
+        for name, schema in schemas.items()
+    }
+    batch_rows = {name: [] for name in schemas}
+    protein_count = 0
 
     def process_protein_record(protein_id, sequence):
+        nonlocal protein_count
         length = len(sequence)
-        lengths.append((protein_id, length))
+        protein_count += 1
+        batch_rows["lengths"].append((protein_id, length))
         counts = {aa: sequence.count(aa) for aa in AMINO_ACIDS}
         entropy = 0.0
         for count in counts.values():
@@ -48,11 +70,13 @@ def analyze_proteins(input_path: str, out_dir: str):
                 entropy -= p * math.log2(p)
         distinct = sum(1 for count in counts.values() if count)
         dominant = max(counts, key=counts.get) if length else ""
-        richness.append((protein_id, length, distinct, dominant,
-                         float(max(counts.values(), default=0) / max(1, length) * 100.0),
-                         float(entropy)))
+        batch_rows["richness"].append((
+            protein_id, length, distinct, dominant,
+            float(max(counts.values(), default=0) / max(1, length) * 100.0),
+            float(entropy),
+        ))
         for aa, count in counts.items():
-            per_protein_composition.append(
+            batch_rows["composition"].append(
                 (protein_id, aa, count, float(count / max(1, length) * 100.0))
             )
         for aa in AMINO_ACIDS:
@@ -63,7 +87,17 @@ def analyze_proteins(input_path: str, out_dir: str):
             start = m.start()
             end = m.end()
             repeat_len = end - start
-            homopolymers.append((protein_id, aa, repeat_len, start, end))
+            batch_rows["homopolymers"].append((protein_id, aa, repeat_len, start, end))
+        if protein_count % 4096 == 0:
+            flush_batches()
+
+    def flush_batches():
+        for name, rows in batch_rows.items():
+            if rows:
+                writers[name].write_table(pa.Table.from_pylist([
+                    dict(zip(schemas[name].names, row)) for row in rows
+                ], schema=schemas[name]))
+                rows.clear()
 
     with open_fn(input_path, "rt") as f:
         for line in f:
@@ -81,6 +115,9 @@ def analyze_proteins(input_path: str, out_dir: str):
         if current_id and seq_chunks:
             full_seq = "".join(seq_chunks).upper()
             process_protein_record(current_id, full_seq)
+    flush_batches()
+    for writer in writers.values():
+        writer.close()
 
     # 1. Write Amino Acid Composition Parquet
     aa_schema = {
@@ -99,41 +136,7 @@ def analyze_proteins(input_path: str, out_dir: str):
     aa_df.write_parquet(out_p / "amino_acid_composition.parquet", compression="zstd")
     print(f"Created amino_acid_composition.parquet with {len(aa_rows)} amino acids.")
 
-    # 2. Write Homopolymers Parquet
-    homo_schema = {
-        "protein_id": pl.Utf8,
-        "amino_acid": pl.Utf8,
-        "repeat_len": pl.UInt32,
-        "start_pos": pl.UInt32,
-        "end_pos": pl.UInt32
-    }
-
-    if homopolymers:
-        homo_df = pl.DataFrame(homopolymers, schema=homo_schema, orient="row")
-    else:
-        homo_df = pl.DataFrame(schema=homo_schema)
-
-    homo_df.write_parquet(out_p / "protein_homopolymers.parquet", compression="zstd")
-    print(f"Created protein_homopolymers.parquet with {len(homopolymers)} repeat tracts.")
-
-    length_df = pl.DataFrame(lengths, schema={
-        "protein_id": pl.Utf8, "length": pl.UInt32
-    }, orient="row")
-    length_df.write_parquet(out_p / "protein_lengths.parquet", compression="zstd")
-
-    composition_df = pl.DataFrame(per_protein_composition, schema={
-        "protein_id": pl.Utf8, "amino_acid": pl.Utf8,
-        "count": pl.UInt32, "frequency_pct": pl.Float32
-    }, orient="row")
-    composition_df.write_parquet(out_p / "protein_composition.parquet", compression="zstd")
-
-    richness_df = pl.DataFrame(richness, schema={
-        "protein_id": pl.Utf8, "length": pl.UInt32, "distinct_amino_acids": pl.UInt8,
-        "dominant_amino_acid": pl.Utf8, "dominant_frequency_pct": pl.Float32,
-        "shannon_entropy": pl.Float32
-    }, orient="row")
-    richness_df.write_parquet(out_p / "protein_richness.parquet", compression="zstd")
-    print(f"Created protein_lengths.parquet for {len(lengths)} proteins.")
+    print(f"Created protein_homopolymers.parquet and protein_lengths.parquet for {protein_count} proteins.")
 
 if __name__ == "__main__":
     args = parse_args()
