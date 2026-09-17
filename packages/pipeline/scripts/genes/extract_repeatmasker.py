@@ -12,11 +12,14 @@ from collections import defaultdict
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract RepeatMasker TE Landscape.")
     parser.add_argument("--input", "-i", required=True, help="Input RepeatMasker out.gz file")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def process_repeatmasker(input_path: str, out_dir: str):

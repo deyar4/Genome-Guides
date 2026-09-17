@@ -2,6 +2,9 @@ import sys
 import argparse
 import re
 from collections import Counter
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from resource_args import add_resource_args
 
 def count_kmers(fasta_file, k, output_file, is_dinucleotide=False):
     if k < 1:
@@ -76,5 +79,6 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("-k", type=int, required=True)
     parser.add_argument("--dinucleotide", action="store_true")
+    add_resource_args(parser)
     args = parser.parse_args()
     count_kmers(args.input, args.k, args.output, args.dinucleotide)

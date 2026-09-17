@@ -14,6 +14,8 @@ import polars as pl
 import math
 import pyarrow as pa
 import pyarrow.parquet as pq
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -21,6 +23,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Parse Protein FASTA to Parquet.")
     parser.add_argument("--input", "-i", required=True, help="Input Protein FASTA (.faa, .fa, .gz)")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory for track parquet files")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def analyze_proteins(input_path: str, out_dir: str):

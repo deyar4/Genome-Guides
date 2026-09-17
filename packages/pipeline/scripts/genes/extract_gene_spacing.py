@@ -8,11 +8,15 @@ Optimized, vectorized version using polars.
 import argparse
 from pathlib import Path
 import duckdb
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract Gene Spacing & Overlaps.")
     parser.add_argument("--input", "-i", required=True, help="Input gene_models.parquet file")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def process_spacing(input_parquet: str, out_dir: str):

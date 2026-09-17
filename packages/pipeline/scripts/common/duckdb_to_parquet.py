@@ -6,6 +6,7 @@ import sys
 import argparse
 from pathlib import Path
 import duckdb
+from resource_args import add_resource_args
 
 QUERIES = {
     "cpg_islands": """
@@ -67,6 +68,7 @@ def main():
     parser.add_argument("-i", "--input", required=True, help="Input TSV file")
     parser.add_argument("-o", "--output", required=True, help="Output Parquet file")
     parser.add_argument("-t", "--track", required=True, choices=list(QUERIES.keys()), help="Track type")
+    add_resource_args(parser)
     args = parser.parse_args()
 
     input_path = Path(args.input)

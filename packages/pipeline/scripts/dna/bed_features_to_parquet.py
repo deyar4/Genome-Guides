@@ -6,6 +6,9 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 
 def convert(input_bed, output, source_url, feature=None):
@@ -43,5 +46,6 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("--source-url", required=True)
     parser.add_argument("--feature")
+    add_resource_args(parser)
     args = parser.parse_args()
     convert(args.input, args.output, args.source_url, args.feature)

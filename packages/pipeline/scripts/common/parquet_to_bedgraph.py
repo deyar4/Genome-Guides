@@ -3,6 +3,9 @@ import argparse
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from resource_args import add_resource_args
 
 def parquet_to_bedgraph(parquet_path, bedgraph_path, column="mean_entropy"):
     parquet = pq.ParquetFile(parquet_path)
@@ -36,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", "--input", required=True, help="Input parquet file")
     parser.add_argument("-o", "--output", required=True, help="Output bedGraph file")
     parser.add_argument("-c", "--column", default="mean_entropy", help="Column to export as track value")
+    add_resource_args(parser)
     args = parser.parse_args()
     
     parquet_to_bedgraph(args.input, args.output, args.column)

@@ -10,6 +10,8 @@ import argparse
 import gzip
 from pathlib import Path
 import polars as pl
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
+from resource_args import add_resource_args
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -17,6 +19,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Extract Protein Terminal Bias.")
     parser.add_argument("--input", "-i", required=True, help="Input Protein FASTA (.faa, .gz)")
     parser.add_argument("--out-dir", "-o", required=True, help="Output directory")
+    add_resource_args(parser)
     return parser.parse_args()
 
 def analyze_terminal_bias(input_path: str, out_dir: str):
