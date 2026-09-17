@@ -6,8 +6,14 @@ rule compute_cpg_islands:
         fai="data/raw/{genome}.fa.fai"
     output:
         parquet="data/tracks/{genome}/all/cpg_islands.parquet"
+    log:
+        "logs/{genome}/compute_cpg_islands.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         bedtools makewindows -g {input.fai} -w 200 -s 200 | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/cpg_windows.bed
         bedtools nuc -fi {input.fasta} -bed data/interim/{wildcards.genome}/cpg_windows.bed | grep -v "^#" > data/interim/{wildcards.genome}/cpg_nuc.bed
@@ -38,8 +44,14 @@ rule compute_ssrs:
         enrichment="data/tracks/{genome}/all/ssr_enrichment.parquet"
     params:
         window_size=config["tracks"]["ssr"]["window_size"]
+    log:
+        "logs/{genome}/compute_ssrs.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         python3 packages/pipeline/scripts/dna/extract_ssrs.py \
             -f {input.fasta} -o data/tracks/{wildcards.genome}/all -w {params.window_size}
         """
@@ -49,8 +61,14 @@ rule compute_isochores:
         gc="data/tracks/{genome}/all/gc_content.parquet"
     output:
         parquet="data/tracks/{genome}/all/isochores.parquet"
+    log:
+        "logs/{genome}/compute_isochores.log"
+    threads: 1
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         python3 packages/pipeline/scripts/dna/extract_isochores.py \
             -i {input.gc} -o {output.parquet}
         """
@@ -60,8 +78,14 @@ rule compute_kmers_3mer:
         fasta="data/raw/{genome}.fa"
     output:
         parquet="data/tracks/{genome}/all/kmers_3mer.parquet"
+    log:
+        "logs/{genome}/compute_kmers_3mer.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all
         python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/tracks/{wildcards.genome}/all/kmers_3mer.tsv -k 3
         python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/tracks/{wildcards.genome}/all/kmers_3mer.tsv -o {output.parquet} -t kmers_3mer
@@ -73,8 +97,14 @@ rule compute_kmers_6mer:
         fasta="data/raw/{genome}.fa"
     output:
         parquet="data/tracks/{genome}/all/kmers_6mer.parquet"
+    log:
+        "logs/{genome}/compute_kmers_6mer.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all
         python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/tracks/{wildcards.genome}/all/kmers_6mer.tsv -k 6
         python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/tracks/{wildcards.genome}/all/kmers_6mer.tsv -o {output.parquet} -t kmers_6mer
@@ -87,8 +117,14 @@ rule compute_shannon_entropy:
         fai="data/raw/{genome}.fa.fai"
     output:
         parquet="data/tracks/{genome}/all/shannon_entropy.parquet"
+    log:
+        "logs/{genome}/compute_shannon_entropy.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         bedtools makewindows -g {input.fai} -w 1000 -s 1000 | sort -k1,1 -k2,2n > data/interim/{wildcards.genome}/entropy_windows.bed
         bedtools nuc -fi {input.fasta} -bed data/interim/{wildcards.genome}/entropy_windows.bed | grep -v "^#" > data/interim/{wildcards.genome}/entropy_nuc.bed
@@ -119,8 +155,14 @@ rule compute_dinucleotides:
         fasta="data/raw/{genome}.fa"
     output:
         parquet="data/tracks/{genome}/all/dinucleotide_frequencies.parquet"
+    log:
+        "logs/{genome}/compute_dinucleotides.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         python3 packages/pipeline/scripts/common/count_kmers.py -i {input.fasta} -o data/interim/{wildcards.genome}/dinucleotides.tsv -k 2 --dinucleotide
         python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i data/interim/{wildcards.genome}/dinucleotides.tsv -o {output.parquet} -t dinucleotides
@@ -132,8 +174,14 @@ rule compute_genomic_homopolymers:
         fasta="data/raw/{genome}.fa"
     output:
         bed="data/interim/{genome}/homopolymers.bed"
+    log:
+        "logs/{genome}/compute_genomic_homopolymers.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/interim/{wildcards.genome}
         > {output.bed}
         for base in A C G T; do
@@ -148,8 +196,14 @@ rule convert_homopolymers_to_parquet:
         bed="data/interim/{genome}/homopolymers.bed"
     output:
         parquet="data/tracks/{genome}/all/homopolymer_genomic_tracts.parquet"
+    log:
+        "logs/{genome}/convert_homopolymers_to_parquet.log"
+    threads: 1
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         python3 packages/pipeline/scripts/common/tsv_to_parquet.py \
             -i {input.bed} \
             -o {output.parquet} \
@@ -162,8 +216,14 @@ rule compute_hecate_mprob:
         fai="data/raw/{genome}.fa.fai"
     output:
         parquet="data/tracks/{genome}/all/hecate_mprob.parquet"
+    log:
+        "logs/{genome}/compute_hecate_mprob.log"
+    threads: config["resources"]["hecate"]["threads"]
+    resources:
+        mem_mb=config["resources"]["hecate"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         rm -f data/interim/{wildcards.genome}/temp.he data/interim/{wildcards.genome}/mprob.xz
         packages/hecate/target/release/hecate --force -e -M markov --mprob data/interim/{wildcards.genome}/mprob.xz {input.fasta} -o data/interim/{wildcards.genome}/temp.he

@@ -8,7 +8,22 @@ tracks_dir: "data/tracks"
 defaults:
   window_size: 1000
   step_size: 1000
-  threads: 8
+  threads: 4
+  mem_mb: 2048
+
+resources:
+  downloads:
+    threads: 1
+    mem_mb: 512
+  lightweight:
+    threads: 1
+    mem_mb: 1024
+  analytical:
+    threads: 4
+    mem_mb: 2048
+  hecate:
+    threads: 4
+    mem_mb: 8192
 
 tracks:
   gc_content:

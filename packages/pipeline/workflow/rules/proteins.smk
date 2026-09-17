@@ -9,8 +9,14 @@ rule parse_protein_census:
         lengths="data/tracks/{genome}/all/protein_lengths.parquet",
         composition="data/tracks/{genome}/all/protein_composition.parquet",
         richness="data/tracks/{genome}/all/protein_richness.parquet"
+    log:
+        "logs/{genome}/parse_protein_census.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         python3 packages/pipeline/scripts/proteins/parse_proteins_to_parquet.py \
             -i {input.faa} \
             -o data/tracks/{wildcards.genome}/all
@@ -21,8 +27,14 @@ rule compute_protein_terminal_bias:
         faa="data/raw/{genome}_protein.faa.gz"
     output:
         term_bias="data/tracks/{genome}/all/protein_terminal_bias.parquet"
+    log:
+        "logs/{genome}/compute_protein_terminal_bias.log"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
     shell:
         """
+        exec > {log} 2>&1
         python3 packages/pipeline/scripts/proteins/extract_protein_terminal_bias.py \
             -i {input.faa} \
             -o data/tracks/{wildcards.genome}/all
