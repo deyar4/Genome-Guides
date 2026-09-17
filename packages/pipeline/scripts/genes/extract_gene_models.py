@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Fast GFF3/GTF Annotation Converter & Density Generator
-Parses GFF3/GTF annotation files into Parquet files for Gene Models, Gene Densities, and Biotype Census.
-Optimized version using regex for fast attribute extraction.
-"""
+"""Extract gene models, density bins, and biotype counts from GFF3/GTF."""
 
 import sys
 import argparse
@@ -17,7 +13,7 @@ import pyarrow.parquet as pq
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
 from resource_args import add_resource_args
 
-# Precompiled regex for rapid extraction of key GTF/GFF attributes
+# Capture identifiers used to deduplicate genes and classify transcripts.
 ATTR_RE = re.compile(
     r'(gene_name|Name|gene_id|ID|transcript_id|gene_biotype|gene_type|gbkey|exon_id)[ \t]*[= ][ \t]*"?([^";]+)"?'
 )
@@ -101,7 +97,7 @@ def run_parser(input_path: str, out_dir: str):
                 w_idx = start // window_size
                 gene_density_windows[(contig, w_idx * window_size)] += 1
 
-    # 1. Write Gene Models Parquet
+
     if gene_writer is not None:
         gene_writer.close()
     else:
@@ -109,7 +105,6 @@ def run_parser(input_path: str, out_dir: str):
         pq.write_table(pa.Table.from_pylist([], schema=empty_schema), out_p / "gene_models.parquet", compression="zstd")
     print(f"Created gene_models.parquet with {gene_count} genes.")
 
-    # 2. Write Gene Density Parquet
     density_schema = {
         "contig": pl.Utf8,
         "start_pos": pl.UInt32,
@@ -131,7 +126,6 @@ def run_parser(input_path: str, out_dir: str):
     density_df.write_parquet(out_p / "gene_density.parquet", compression="zstd")
     print(f"Created gene_density.parquet with {len(density_rows)} window bins.")
 
-    # 3. Write Biotype Census Parquet
     biotype_schema = {
         "biotype": pl.Utf8,
         "count": pl.UInt32

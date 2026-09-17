@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Convert TSV to Parquet using DuckDB SQL schemas
-"""
+"""Convert fixed-schema TSV tracks to Parquet with DuckDB."""
 import sys
 import argparse
 from pathlib import Path

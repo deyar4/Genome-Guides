@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Fast Protein FASTA Census & Homopolymer Analyzer
-Parses protein FASTA files into Parquet files for Amino Acid Composition and Homopolymer Repeats.
-Optimized version using fast C-level str.count calls and optimized regex.
-"""
+"""Extract protein composition and homopolymer tracks from FASTA."""
 
 import sys
 import argparse
@@ -122,7 +118,7 @@ def analyze_proteins(input_path: str, out_dir: str):
     for writer in writers.values():
         writer.close()
 
-    # 1. Write Amino Acid Composition Parquet
+
     aa_schema = {
         "amino_acid": pl.Utf8,
         "count": pl.UInt64,

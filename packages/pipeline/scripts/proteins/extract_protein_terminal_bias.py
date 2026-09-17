@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Protein Terminal Bias Extractor
-Analyzes N-terminal (first 20 AA) vs C-terminal (last 20 AA) amino acid composition bias.
-Optimized version using fast C-level str.count calls.
-"""
+"""Extract amino-acid composition bias at protein termini."""
 
 import sys
 import argparse

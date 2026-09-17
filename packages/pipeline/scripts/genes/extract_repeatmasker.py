@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Fast RepeatMasker Transposon Landscape Extractor
-Parses UCSC RepeatMasker .out.gz file into Parquet for TE families & 100kb window densities.
-"""
+"""Extract RepeatMasker families and 100-kb density tracks."""
 
 import sys
 import argparse
@@ -82,7 +79,7 @@ def process_repeatmasker(input_path: str, out_dir: str):
 
     print(f"Created repeatmasker_families.parquet with {record_count} transposable elements.")
 
-    # 2. Write RepeatMasker Density Parquet
+
     d_schema = {
         "contig": pl.Utf8,
         "start_pos": pl.UInt32,

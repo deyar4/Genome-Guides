@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Gene Spacing & Intergenic Distance Extractor
-Calculates intergenic distances between consecutive genes and flags gene overlap pairs.
-Optimized, vectorized version using polars.
-"""
+"""Calculate intergenic distances and overlapping gene pairs."""
 
 import argparse
 from pathlib import Path

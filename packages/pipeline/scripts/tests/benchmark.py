@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Performance Benchmark Suite
-Compares the execution time of Python-based extraction versus seqkit CLI processing,
-and benchmarks DuckDB query speeds.
-"""
+"""Benchmark selected extraction and DuckDB operations."""
 
 import time
 import subprocess
@@ -15,14 +11,12 @@ import duckdb
 def benchmark_pipeline_extraction():
     print("--- 1. Pipeline Extraction Benchmark ---")
     
-    # 1. Create a large-ish synthetic FASTA file
-    fasta_content = ">chr_bench\n" + "ATGC" * 250000 + "\n" # 1 Million base pairs
+    fasta_content = ">chr_bench\n" + "ATGC" * 250000 + "\n"
     with tempfile.NamedTemporaryFile(mode="w", suffix=".fa", delete=False) as f:
         f.write(fasta_content)
         fasta_path = f.name
 
     try:
-        # Benchmark Python implementation (GC content & skew)
         py_script = Path("packages/pipeline/scripts/dna/extract_gc_skew.py")
         if py_script.exists():
             t0 = time.perf_counter()
@@ -38,7 +32,6 @@ def benchmark_pipeline_extraction():
             print("Python gc_skew script not found. Skipping.")
             t_py = None
 
-        # Benchmark seqkit CLI implementation
         t0 = time.perf_counter()
         cmd = f"seqkit sliding -g -W 1000 -s 1000 {fasta_path} | seqkit fx2tab -n -g -G -C A,C,G,T,N -B A,C,G,T,N -H > data/interim/bench_seqkit.tsv"
         subprocess.run(cmd, shell=True, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -50,7 +43,6 @@ def benchmark_pipeline_extraction():
             print(f"-> Speedup factor: {speedup:.2f}x")
 
     finally:
-        # Cleanup
         Path(fasta_path).unlink()
         for p in ["data/interim/bench_py.tsv", "data/interim/bench_seqkit.tsv"]:
             if Path(p).exists():
@@ -63,7 +55,6 @@ def benchmark_duckdb_queries():
         print(f"Synthetic parquet track {parquet_path} not found. Run snakemake first. Skipping database benchmark.")
         return
 
-    # Benchmark query speed using DuckDB
     con = duckdb.connect(database=":memory:")
     
     t0 = time.perf_counter()

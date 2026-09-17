@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Universal TSV to ZSTD Compressed Parquet Converter
-"""
+"""Convert genomic TSV tracks to compressed Parquet."""
 
 import sys
 import argparse
@@ -10,7 +8,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 from resource_args import add_resource_args
 
-# We define the column names and types for each schema
+# Keep coordinate and metric types explicit so downstream tracks remain consistent.
 SCHEMAS = {
     "gc_content": {
         "contig": pl.Utf8,
@@ -193,7 +191,6 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
         print(f"Created empty Parquet track: {output_parquet}")
         return
 
-    # Check if it is a seqkit sliding-window GC/Skew output
     is_seqkit_gc = False
     if schema_name == "gc_content":
         try:
@@ -216,7 +213,6 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
 
     elif schema_name == "assembly_gaps":
         try:
-            # Check if it is a BED file from seqkit locate (which has 6 columns, no header)
             with open(input_tsv, "r") as f:
                 first_line = f.readline().strip()
 
@@ -226,7 +222,7 @@ def convert_tsv_to_parquet(input_tsv: str, output_parquet: str, schema_name: str
                 print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
                 return
             else:
-                # Fallback to standard reading
+                # Preserve the declared schema for already-normalized gap tracks.
                 write_batched_csv(input_tsv, output_parquet, schema, list(schema.keys()))
                 print(f"Successfully created Parquet track: {output_parquet} ({out_path.stat().st_size} bytes)")
                 return

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Pipeline Integration Test & Synthetic Data Generator
-"""
+"""Run a small end-to-end pipeline smoke test."""
 
 import sys
 import subprocess

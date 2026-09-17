@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""
-Genome Guides - Splice Site Consensus & Detailed ncRNA Sub-Class Extractor
-Parses GTF annotations and sequence fasta to build Splice Site Dinucleotide Consensus and ncRNA Sub-Class Census.
-Optimized version using regex for fast attribute extraction.
-"""
+"""Extract splice-site and non-coding RNA summary tracks from GTF data."""
 
 import sys
 import argparse
@@ -17,7 +13,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
 from resource_args import add_resource_args
 
-# Precompiled regex for rapid extraction of key GTF/GFF attributes
+# Capture the identifiers needed to group exons and classify RNA biotypes.
 ATTR_RE = re.compile(
     r'(gene_name|Name|gene_id|ID|transcript_id|gene_biotype|gene_type|gbkey|exon_id)[ \t]*[= ][ \t]*"?([^";]+)"?'
 )
@@ -83,7 +79,6 @@ def run_extractor(gtf_path: str, out_dir: str):
             elif feature_type == "exon" and transcript_id:
                 exons_by_transcript[transcript_id].append((contig, start, end, strand))
 
-    # 1. Write Detailed ncRNA Census Parquet
     ncrna_schema = {
         "ncrna_subclass": pl.Utf8,
         "count": pl.UInt32
@@ -98,7 +93,6 @@ def run_extractor(gtf_path: str, out_dir: str):
     nc_df.write_parquet(out_p / "ncrna_detailed_census.parquet", compression="zstd")
     print(f"Created ncrna_detailed_census.parquet with {len(nc_rows)} ncRNA subclasses.")
 
-    # 2. Write Gene Isoform Counts Parquet
     iso_schema = {
         "gene_name": pl.Utf8,
         "isoform_count": pl.UInt32
