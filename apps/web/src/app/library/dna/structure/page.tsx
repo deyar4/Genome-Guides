@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   Map,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DNAStructurePage() {
   const { 
@@ -37,8 +38,10 @@ export default function DNAStructurePage() {
     return primaryChroms.map(c => {
       const isCircular = c.name.toLowerCase().includes('m');
       const ts = telomeres.data?.filter(t => t.chrom === c.name) || [];
-      const hasFive = ts.some(t => t.location === 'five_prime');
-      const hasThree = ts.some(t => t.location === 'three_prime');
+      // The API labels every record 't2t_telomeres' (no 5'/3' field), so the end is derived from
+      // coordinates: a record starting at 0 is the 5' end, one ending at the chromosome length the 3' end.
+      const hasFive = ts.some(t => t.position === 0);
+      const hasThree = ts.some(t => t.end === c.length);
       const hasCen = centromeres.data?.some(cen => {
         const cName = c.name.replace('chr', '');
         const cenName = (cen.chrom || '').replace('chr', '');
@@ -63,9 +66,13 @@ export default function DNAStructurePage() {
   const t2tCount = useMemo(() => integrityData.filter(d => d.isComplete).length, [integrityData]);
 
   // 2. Fetch Additional Structural Data
+  // The unrestricted /dna/isochores response is ~170 MB (1.67 M rows), so always request one chromosome.
+  const [isoChrom, setIsoChrom] = React.useState<string | undefined>(undefined);
+  const isoChromEff = isoChrom ?? primaryChroms[0]?.name;
   const isochores = useQuery({
-    queryKey: ['isochores', activeGenome],
-    queryFn: () => dnaApi.getIsochores(activeGenome),
+    queryKey: ['isochores', activeGenome, isoChromEff],
+    queryFn: () => dnaApi.getIsochores(activeGenome, isoChromEff),
+    enabled: !!isoChromEff,
   });
 
   const cpgIslands = useQuery({
@@ -98,7 +105,7 @@ export default function DNAStructurePage() {
                  <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Annotated Centromeres</div>
+                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Centromere Regions</div>
                  <div className="text-2xl font-mono font-bold text-slate-900 dark:text-zinc-100">{centromeres.data?.length || 0}</div>
               </div>
            </Card>
@@ -212,15 +219,22 @@ export default function DNAStructurePage() {
                  <div className="text-[11px] text-slate-500 leading-relaxed italic mb-4">
                    Runs of consecutive 1 kb windows in the same GC class: L1 (&lt;37%), L2 (37-41%), H1 (41-46%), H2 (46-53%), H3 (&ge;53% GC). These are not literature isochores, which are defined on much larger windows.
                  </div>
+                 <Select value={isoChromEff} onValueChange={setIsoChrom}>
+                   <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Chromosome" /></SelectTrigger>
+                   <SelectContent>
+                     {primaryChroms.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                   </SelectContent>
+                 </Select>
+                 <div className="text-[10px] text-slate-500">First 10 runs by start position on {isoChromEff} ({isochores.data ? formatNumber(isochores.data.length) : '...'} runs in total), not ranked.</div>
                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
-                    <span>Region</span>
+                    <span>Region [start, end) bp</span>
                     <span>Class</span>
                     <span className="text-right">GC %</span>
                  </div>
                  <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar pr-2">
                     {isochores.data?.slice(0, 10).map((i, idx) => (
                       <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800">
-                         <span className="font-mono text-xs">{i.chrom}:{Math.floor(i.start/1e6)}Mb</span>
+                         <span className="font-mono text-xs">{i.chrom}:{formatNumber(i.start)}-{formatNumber(i.end)}</span>
                          <Badge variant="secondary" className="text-[9px] font-bold">{i.isochore_class}</Badge>
                          <span className="font-mono text-xs text-blue-500">{(i.gc_content).toFixed(1)}%</span>
                       </div>
@@ -230,7 +244,7 @@ export default function DNAStructurePage() {
            </GenomicChartContainer>
 
            <GenomicChartContainer
-             title="CpG Island Density"
+             title="CpG Island Records"
              subtitle="Detected regulatory clusters using Gardiner-Garden & Frommer criteria."
              isLoading={cpgIslands.isLoading}
              isError={cpgIslands.isError}
@@ -240,9 +254,12 @@ export default function DNAStructurePage() {
               <div className="flex flex-col h-full">
                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
                     <div className="text-4xl font-mono font-bold text-slate-900 dark:text-zinc-100 mb-2">
-                       {cpgIslands.data?.length.toLocaleString() || 0}
+                       {cpgIslands.data ? `${cpgIslands.data.length.toLocaleString()}${cpgIslands.data.length >= 1000 ? '+' : ''}` : '...'}
                     </div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Global CpG Islands</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CpG records returned</div>
+                    {cpgIslands.data && cpgIslands.data.length >= 1000 && (
+                      <p className="text-[10px] text-amber-600 mt-2 max-w-[260px]">The API returns at most 1,000 records (200 bp each, adjacent ones not merged), so the genome-wide total is not shown.</p>
+                    )}
                     <p className="text-[10px] text-slate-500 mt-4 max-w-[200px]">
                       Highly conserved regions often associated with gene promoters and transcription start sites.
                     </p>

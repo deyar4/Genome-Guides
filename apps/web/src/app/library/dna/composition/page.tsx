@@ -38,19 +38,9 @@ export default function DNACompositionPage() {
       { id: 'T', name: 'Thymine', value: nuclearComp.t, color: NUCLEOTIDE_COLORS.T, desc: 'Pyrimidine base, unique to DNA (replaced by Uracil in RNA).' },
     ].map(b => ({
       ...b,
-      percent: (b.value / totalNuclearBases) * 100,
-      sparkline: primaryChroms.map(c => {
-         const d = c.dinucleotides || {};
-         const chromTotal = (d.AA||0)+(d.AC||0)+(d.AG||0)+(d.AT||0)+(d.CA||0)+(d.CC||0)+(d.CG||0)+(d.CT||0)+(d.GA||0)+(d.GC||0)+(d.GG||0)+(d.GT||0)+(d.TA||0)+(d.TC||0)+(d.TG||0)+(d.TT||0);
-         let count = 0;
-         if (b.id === 'A') count = (d.AA||0)+(d.AC||0)+(d.AG||0)+(d.AT||0);
-         if (b.id === 'C') count = (d.CA||0)+(d.CC||0)+(d.CG||0)+(d.CT||0);
-         if (b.id === 'G') count = (d.GA||0)+(d.GC||0)+(d.GG||0)+(d.GT||0);
-         if (b.id === 'T') count = (d.TA||0)+(d.TC||0)+(d.TG||0)+(d.TT||0);
-         return { x: c.name, y: chromTotal > 0 ? (count / chromTotal * 100) : 0 };
-      })
+      percent: (b.value / totalNuclearBases) * 100
     }));
-  }, [nuclearComp, totalNuclearBases, primaryChroms]);
+  }, [nuclearComp, totalNuclearBases]);
 
   const heatmapData = useMemo(() => {
     if (!dinucleotides.data?.dinucleotides) return [];
@@ -64,26 +54,19 @@ export default function DNACompositionPage() {
     }));
   }, [dinucleotides.data]);
 
+  // Per-chromosome A/C/G/T counts are not served by the API (the per-chromosome
+  // dinucleotide field is an empty placeholder), so only GC vs AT is shown.
   const chromProfiles = useMemo(() => {
-    return primaryChroms.map(c => {
-      const d = c.dinucleotides || {};
-      const a = (d.AA || 0) + (d.AC || 0) + (d.AG || 0) + (d.AT || 0);
-      const cc = (d.CA || 0) + (d.CC || 0) + (d.CG || 0) + (d.CT || 0);
-      const g = (d.GA || 0) + (d.GC || 0) + (d.GG || 0) + (d.GT || 0);
-      const t = (d.TA || 0) + (d.TC || 0) + (d.TG || 0) + (d.TT || 0);
-      const total = a + cc + g + t;
-      return {
-        id: c.name.replace('chr', ''),
-        A: total > 0 ? (a / total * 100) : 0,
-        C: total > 0 ? (cc / total * 100) : 0,
-        G: total > 0 ? (g / total * 100) : 0,
-        T: total > 0 ? (t / total * 100) : 0,
-      };
-    }).reverse();
+    return primaryChroms.map(c => ({
+      id: c.name.replace('chr', ''),
+      GC: c.gc_content,
+      AT: 100 - c.gc_content,
+    })).reverse();
   }, [primaryChroms]);
 
-  const globalGC = nuclearComp?.gc_content || 41.0;
+  const globalGC = nuclearComp?.gc_content;
   const gcVariationData = useMemo(() => {
+    if (globalGC == null) return [];
     return primaryChroms.map(c => ({
       id: c.name.replace('chr', ''),
       gc: c.gc_content,
@@ -108,7 +91,7 @@ export default function DNACompositionPage() {
             />
             <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800">
                <Activity className="h-3.5 w-3.5 text-slate-400" />
-               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Real-time Analysis</span>
+               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Precomputed Track</span>
             </div>
           </div>
 
@@ -138,7 +121,6 @@ export default function DNACompositionPage() {
                      unit="%"
                      color={base.color}
                      description={base.desc}
-                     sparklineData={base.sparkline}
                    />
                  ))
                )}
@@ -221,20 +203,20 @@ export default function DNACompositionPage() {
         <section>
           <GenomicChartContainer
             title="Chromosome Composition Profiles"
-            subtitle="Comparative breakdown of nucleotide distribution for each primary scaffold."
+            subtitle="GC versus AT content (percent of A, C, G, T bases) for each primary scaffold."
             isLoading={isLoading}
             isError={isError}
             height="h-[600px]"
           >
             <ResponsiveBar
               data={chromProfiles}
-              keys={['A', 'C', 'G', 'T']}
+              keys={['GC', 'AT']}
               indexBy="id"
               layout="horizontal"
               margin={{ top: 20, right: 30, bottom: 50, left: 40 }}
               padding={0.2}
               valueScale={{ type: 'linear' }}
-              colors={[NUCLEOTIDE_COLORS.A, NUCLEOTIDE_COLORS.C, NUCLEOTIDE_COLORS.G, NUCLEOTIDE_COLORS.T]}
+              colors={['#06b6d4', '#94a3b8']}
               axisBottom={{
                 tickSize: 5,
                 tickPadding: 5,

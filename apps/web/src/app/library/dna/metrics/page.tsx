@@ -61,7 +61,7 @@ export default function ChromosomeMetricsPage() {
               label="Primary Sequence" 
               value={formatGb(totalPrimaryLength)}
               unit="Gb"
-              description="Sum of 25 canonical chromosomes."
+              description={`Sum of ${primaryChroms.length} primary sequences (incl. chrM).`}
               color="#3b82f6"
             />
             <GenomicMetricCard 
@@ -80,7 +80,7 @@ export default function ChromosomeMetricsPage() {
             <GenomicMetricCard 
               label="Total Assembly" 
               value={assembly?.contig_count ? formatNumber(assembly.contig_count) : '0'}
-              description="All assembly units (incl. alts)."
+              description="Sequences listed in the assembly index."
               color="#94a3b8"
             />
           </div>
@@ -130,7 +130,7 @@ export default function ChromosomeMetricsPage() {
                     <TableHead className="w-48">Relative Scale (Mb)</TableHead>
                     <TableHead className="text-right">Absolute Length</TableHead>
                     <TableHead className="text-right">GC Content</TableHead>
-                    <TableHead className="text-right">Skew</TableHead>
+                    <TableHead className="text-right">GC Skew (%)</TableHead>
                     <TableHead className="text-right">Type</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -190,7 +190,7 @@ export default function ChromosomeMetricsPage() {
                              </div>
                           </TableCell>
                           <TableCell className="text-right font-mono text-[11px] text-slate-400">
-                             {c.gc_skew != null ? c.gc_skew.toFixed(3) : "N/A"}
+                             {c.gc_skew != null ? `${c.gc_skew.toFixed(2)}%` : "N/A"}
                           </TableCell>
                           <TableCell className="text-right">
                              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-[9px] font-bold uppercase tracking-tighter text-slate-500">
@@ -262,7 +262,7 @@ export default function ChromosomeMetricsPage() {
                </div>
                <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">Understanding Isochores</h3>
                <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
-                 Genomic composition is not uniform. The scatter plot reveals a well-documented academic phenomenon: **smaller human chromosomes (like 19, 22) tend to be more GC-rich** than larger ones.
+                 Genomic composition is not uniform. The scatter plot reveals a well-documented academic phenomenon: smaller human chromosomes (like 19, 22) tend to be more GC-rich than larger ones.
                </p>
                <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
                  This is linked to the distribution of &quot;Isochores&quot;—large genomic regions with relatively homogeneous base composition. High GC areas are often associated with:

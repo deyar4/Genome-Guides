@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGenomeStore } from '@/store/use-genome-store';
 import { dnaApi } from '@/lib/api';
-import { useDNAStats } from '@/hooks/use-dna-stats';
 import { LibraryShell } from '@/components/layout/library-shell';
 import { Card } from '@/components/ui/card';
 import { ResponsiveBar } from '@nivo/bar';
@@ -23,21 +22,16 @@ import {
 
 export default function KmerExplorerPage() {
   const { activeGenome } = useGenomeStore();
-  const { primaryChroms } = useDNAStats();
-  const [selectedChrom, setSelectedChrom] = useState<string>('chr1');
-  const [startPos, setStartPos] = useState<number>(0);
+  // The backend serves genome-wide k-mer counts only (chrom/start/end are ignored) and k in {3, 6}.
   const [kmerSize, setKmerSize] = useState<number>(6); // Default to hexamers
   const chartTheme = useChartTheme();
 
   const { data: kmerData, isLoading } = useQuery({
-    queryKey: ['kmers', activeGenome, selectedChrom, kmerSize, startPos],
-    queryFn: () => dnaApi.getKmers(activeGenome, selectedChrom, { 
+    queryKey: ['kmers', activeGenome, kmerSize],
+    queryFn: () => dnaApi.getKmers(activeGenome, 'genome', { 
       k: kmerSize, 
       top_n: 20,
-      start: startPos,
-      end: startPos + 1000000
     }),
-    enabled: !!selectedChrom,
   });
 
   return (
@@ -55,36 +49,13 @@ export default function KmerExplorerPage() {
            </h4>
            <div className="flex flex-wrap gap-4 items-center">
               <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">Chromosome</span>
-                <Select value={selectedChrom} onValueChange={setSelectedChrom}>
-                  <SelectTrigger className="w-40 bg-white dark:bg-zinc-950 border-slate-200 dark:border-zinc-800">
-                      <SelectValue placeholder="Select Chromosome" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      {primaryChroms.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">Start Pos (bp)</span>
-                <input 
-                  type="number"
-                  value={startPos}
-                  onChange={(e) => setStartPos(Math.max(0, parseInt(e.target.value) || 0))}
-                  className="w-40 h-10 px-3 rounded-md border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-bold text-slate-400 uppercase ml-1">K-mer size</span>
                 <Select value={kmerSize.toString()} onValueChange={(v) => setKmerSize(parseInt(v))}>
                   <SelectTrigger className="w-40 bg-white dark:bg-zinc-950 border-slate-200 dark:border-zinc-800">
                       <SelectValue placeholder="K-Mer Size" />
                   </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="4">Tetramers (k=4)</SelectItem>
-                      <SelectItem value="5">Pentamers (k=5)</SelectItem>
+                      <SelectItem value="3">Trimers (k=3)</SelectItem>
                       <SelectItem value="6">Hexamers (k=6)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -95,8 +66,8 @@ export default function KmerExplorerPage() {
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-4 rounded-lg flex items-start gap-3">
           <Activity className="h-5 w-5 text-blue-500 mt-0.5" />
           <div className="text-sm text-blue-800 dark:text-blue-300">
-            <p className="font-bold mb-1">Performance Optimization Active</p>
-            <p>To ensure high responsiveness, k-mer analysis is performed on a 1MB sliding window. Use the start position filter to explore different regions of the chromosome.</p>
+            <p className="font-bold mb-1">Genome-wide counts</p>
+            <p>K-mer counts are precomputed over the whole assembly for k = 3 and k = 6 (all positions, overlapping k-mers, ACGT only). Per-chromosome or per-region counts are not available.</p>
           </div>
         </div>
 
@@ -105,13 +76,13 @@ export default function KmerExplorerPage() {
            <GenomicMetricCard 
              label="Total K-Mers Scanned"
              value={kmerData?.total_kmers ? formatNumber(kmerData.total_kmers) : '...'}
-             description={`Total overlapping ${kmerSize}-mers analyzed in ${selectedChrom}.`}
+             description={`Total overlapping ${kmerSize}-mers counted genome-wide.`}
              color="#3b82f6"
            />
            <GenomicMetricCard 
              label="Unique Motifs Found"
              value={kmerData?.unique_kmers ? formatNumber(kmerData.unique_kmers) : '...'}
-             description="Distinct sequences observed (Theoretical max: 4^k)."
+             description={`Distinct ${kmerSize}-mers observed (theoretical max: 4^${kmerSize} = ${formatNumber(4 ** kmerSize)}).`}
              color="#8b5cf6"
            />
         </div>
@@ -120,7 +91,7 @@ export default function KmerExplorerPage() {
         <section>
           <SectionHeader 
             title={`Top 20 Most Frequent ${kmerSize}-mers`}
-            subtitle="The most dominant sequence patterns in the selected region."
+            subtitle="Highest-count k-mers in the assembly, sorted by count."
             badge="Frequency Distribution"
           />
           <Card className="p-8 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm h-[500px] flex flex-col mt-6">
@@ -150,17 +121,17 @@ export default function KmerExplorerPage() {
                        tickSize: 5,
                        tickPadding: 5,
                        tickRotation: 0,
-                       legend: 'Relative Frequency',
+                       legend: 'Share of all k-mers (%)',
                        legendPosition: 'middle',
                        legendOffset: -50,
-                       format: d => `${(Number(d) * 100).toFixed(2)}%`
+                       format: d => `${Number(d).toFixed(2)}%`
                      }}
                      enableLabel={false}
                      tooltip={({ value, indexValue }) => (
                         <div className="bg-white dark:bg-zinc-900 p-2 border border-slate-200 dark:border-zinc-800 rounded-lg shadow-sm">
                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{indexValue}</div>
                            <div className="text-sm font-bold text-slate-900 dark:text-zinc-100">
-                             {(Number(value) * 100).toFixed(4)}%
+                             {Number(value).toFixed(4)}%
                            </div>
                            <div className="text-[10px] text-slate-500 mt-1 font-mono">
                              Count: {formatNumber(kmerData.kmers.find(k => k.kmer === indexValue)?.count || 0)}

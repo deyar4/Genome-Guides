@@ -33,7 +33,9 @@ interface ChromosomeBrowserProps {
 
 export function ChromosomeBrowser({ chromosomes, initialChrom }: ChromosomeBrowserProps) {
   const { activeGenome } = useGenomeStore();
-  const [selectedChrom, setSelectedChrom] = useState(initialChrom || chromosomes[0]?.name);
+  // chromosomes arrive asynchronously, so fall back to the first one at render time
+  const [chosenChrom, setSelectedChrom] = useState<string | undefined>(initialChrom);
+  const selectedChrom = chosenChrom ?? chromosomes[0]?.name;
   const chartTheme = useChartTheme();
 
   const currentChrom = chromosomes.find(c => c.name === selectedChrom);
@@ -176,7 +178,7 @@ export function ChromosomeBrowser({ chromosomes, initialChrom }: ChromosomeBrows
            <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">Resolution</div>
               <div className="text-lg font-bold text-slate-900 dark:text-zinc-100">
-                {formatNumber(Math.max(10000, Math.floor((currentChrom?.length || 0) / 1000)))} bp
+                {formatNumber(alignToBaseWindow(Math.max(10000, (currentChrom?.length || 0) / 1000)))} bp
               </div>
            </div>
            <div className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">

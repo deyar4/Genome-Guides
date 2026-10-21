@@ -22,7 +22,7 @@ export default function SequenceToolsPage() {
   const chartTheme = useChartTheme();
   
   const [chrom, setChrom] = useState('chr1');
-  const [start, setStart] = useState('1');
+  const [start, setStart] = useState('0');
   const [end, setEnd] = useState('1000');
   const [fetchTrigger, setFetchTrigger] = useState(0);
 
@@ -163,7 +163,7 @@ export default function SequenceToolsPage() {
             <div className="p-3 bg-slate-50 dark:bg-zinc-900 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between px-6">
                <div className="flex items-center gap-2">
                   <FileText className="h-3.5 w-3.5 text-slate-400" />
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{chrom}:{start}-{end}</span>
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{chrom}:{start}-{end} (0-based, half-open)</span>
                </div>
                <Badge variant="outline" className="text-[9px] font-bold text-slate-400 uppercase">{sequence?.length || 0} bp</Badge>
             </div>
@@ -194,7 +194,7 @@ export default function SequenceToolsPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Strand Asymmetry (GC Skew)" 
-              subtitle="Visualization of (G-C)/(G+C) distribution revealing potential replication origins and mutational bias."
+              subtitle="GC skew = 100 * (G - C) / (G + C), in percent, per window, along the chromosome."
             />
             <div className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-full border border-blue-100 dark:border-blue-800 text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest flex items-center gap-2">
                <Activity className="h-3 w-3" />
@@ -214,14 +214,14 @@ export default function SequenceToolsPage() {
               data={skewData}
               margin={{ top: 20, right: 30, bottom: 50, left: 60 }}
               xScale={{ type: 'point' }}
-              yScale={{ type: 'linear', min: -0.15, max: 0.15, stacked: false }}
+              yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false }}
               curve="monotoneX"
               axisBottom={null}
               axisLeft={{
                 tickSize: 5,
                 tickPadding: 5,
                 tickRotation: 0,
-                legend: 'Skew Index',
+                legend: 'GC skew (%)',
                 legendPosition: 'middle',
                 legendOffset: -45
               }}
@@ -237,9 +237,9 @@ export default function SequenceToolsPage() {
                 <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg text-[11px] shadow-xl border border-slate-200 dark:border-zinc-800">
                   <div className="font-bold border-b border-slate-100 dark:border-zinc-800 pb-1 mb-1">Position: {formatNumber((point.data as { pos: number }).pos)} bp</div>
                   <div className="flex items-center justify-between gap-4">
-                     <span className="text-slate-400">Skew Index:</span>
+                     <span className="text-slate-400">GC skew (%):</span>
                      <span className={cn("font-mono font-bold", (point.data.y as number) >= 0 ? "text-emerald-500" : "text-amber-500")}>
-                       {(point.data.y as number).toFixed(4)}
+                       {(point.data.y as number).toFixed(3)}%
                      </span>
                   </div>
                 </div>

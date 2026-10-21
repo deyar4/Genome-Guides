@@ -28,7 +28,7 @@ export default function RegionInspectorPage() {
 
   const queryStart = parseInt(start);
   const queryEnd = parseInt(end);
-  const isValid = !isNaN(queryStart) && !isNaN(queryEnd) && queryEnd > queryStart && (queryEnd - queryStart) <= 100000;
+  const isValid = !isNaN(queryStart) && !isNaN(queryEnd) && queryStart >= 0 && queryEnd > queryStart && (queryEnd - queryStart) <= 100000;
 
   const { data: sequence, isLoading: seqLoading, refetch: fetchSeq } = useQuery({
     queryKey: ['sequence', activeGenome, chrom, queryStart, queryEnd],
@@ -63,10 +63,14 @@ export default function RegionInspectorPage() {
 
   const gcContent = useMemo(() => {
     if (!sequence) return 0;
+    // GC / (A+C+G+T): N and other symbols are excluded from the denominator (counted separately below)
     const s = sequence.toUpperCase();
     const g = s.split('G').length - 1;
     const c = s.split('C').length - 1;
-    return ((g + c) / s.length) * 100;
+    const a = s.split('A').length - 1;
+    const t = s.split('T').length - 1;
+    const acgt = a + c + g + t;
+    return acgt > 0 ? ((g + c) / acgt) * 100 : 0;
   }, [sequence]);
 
   return (
@@ -163,7 +167,7 @@ export default function RegionInspectorPage() {
                       Base Counts
                    </h4>
                    <div className="grid grid-cols-2 gap-4">
-                      {['A', 'C', 'G', 'T'].map(base => (
+                      {['A', 'C', 'G', 'T', 'N'].map(base => (
                         <div key={base} className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl border border-slate-200 dark:border-zinc-800">
                            <div className="text-[10px] font-bold text-slate-400 mb-1">{base}</div>
                            <div className="text-sm font-bold text-slate-900 dark:text-zinc-100 font-mono">
@@ -206,16 +210,15 @@ export default function RegionInspectorPage() {
                   <Card className="p-6 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                      <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest mb-6 flex items-center gap-2">
                         <Activity className="h-4 w-4 text-cyan-500" />
-                        Windowed Composition Class
+                        Windowed Composition
                      </h4>
                      <div className="overflow-auto custom-scrollbar max-h-[300px]">
                         <Table>
                            <TableHeader>
                               <TableRow>
-                                 <TableHead className="text-[10px] uppercase">Window</TableHead>
+                                 <TableHead className="text-[10px] uppercase">Window start (bp)</TableHead>
                                  <TableHead className="text-[10px] uppercase">GC %</TableHead>
-                                 <TableHead className="text-[10px] uppercase">Skew</TableHead>
-                                 <TableHead className="text-[10px] uppercase">Entropy</TableHead>
+                                 <TableHead className="text-[10px] uppercase">GC skew (%)</TableHead>
                               </TableRow>
                            </TableHeader>
                            <TableBody>
@@ -223,8 +226,7 @@ export default function RegionInspectorPage() {
                                 <TableRow key={i}>
                                    <TableCell className="font-mono text-[10px]">{formatNumber(w.start)}</TableCell>
                                    <TableCell className="font-mono text-[10px] font-bold text-cyan-500">{(w.gc_content).toFixed(1)}%</TableCell>
-                                   <TableCell className="font-mono text-[10px]">{w.gc_skew?.toFixed(3) || '0.000'}</TableCell>
-                                   <TableCell className="font-mono text-[10px]">{w.entropy?.toFixed(3) || '0.000'}</TableCell>
+                                   <TableCell className="font-mono text-[10px]">{w.gc_skew != null ? `${w.gc_skew.toFixed(2)}%` : 'n/a'}</TableCell>
                                 </TableRow>
                               ))}
                            </TableBody>
