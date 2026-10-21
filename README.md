@@ -11,7 +11,6 @@ repeat, gene, RNA, and protein tracks for browser and API access.
 | `packages/pipeline/workflow/` | Snakemake entrypoint and rule files |
 | `packages/pipeline/scripts/` | Standalone analytical and conversion scripts |
 | `packages/pipeline/config.yaml` | Input paths, thresholds, windows, and resource defaults |
-| `packages/hecate/` | Rust sequence-indexing and compression component |
 | `apps/backend/` | FastAPI service and DuckDB/Parquet access |
 | `apps/web/` | Next.js frontend |
 | `docs/` | Architecture and data-reference documents |
