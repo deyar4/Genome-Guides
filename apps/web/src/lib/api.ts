@@ -24,9 +24,9 @@ import {
   HostGuestRelationship,
   SpliceSiteConsensus,
   SpliceSiteRecord,
-  RNAEditingSite,
   ProteinStats,
   AminoAcidComposition,
+  TerminalComposition,
   ProteinBase,
   HomopolymerTract,
   IsochoreStats,
@@ -102,7 +102,7 @@ export const dnaApi = {
   getSequence: (build: string, chrom: string, start: number, end: number) => 
     fetcher<string>("/dna/sequence", { build, chrom, start, end }),
   getSequenceWindows: (build: string, chrom: string, params: { start?: number, end?: number, step?: number, limit?: number, offset?: number } = {}) => 
-    fetcher<{ start: number; end: number; gc_content: number; gc_skew: number; entropy: number }[]>("/dna/sequence/window", { build, chrom, ...params }),
+    fetcher<{ start: number; end: number; gc_content: number; gc_skew: number | null }[]>("/dna/sequence/window", { build, chrom, ...params }),
   getGCSkew: (build: string, chrom: string, window_size = 10000) => 
     fetcher<{ start: number; gc_skew: number }[]> (`/dna/stats/${chrom}/gc-skew`, { build, window_size }),
   getIsochores: (build: string, chrom?: string) => fetcher<IsochoreStats[]>("/dna/isochores", { build, ...(chrom ? { chrom } : {}) }),
@@ -144,23 +144,21 @@ export const rnaApi = {
     fetcher<SpliceSiteConsensus[]>("/rna/splice-sites", { build, ...(site_type ? { site_type } : {}) }),
   getSpliceRecords: (build: string, params: { site_type?: string; chrom?: string; limit?: number } = {}) =>
     fetcher<SpliceSiteRecord[]>("/rna/splice-sites/records", { build, ...params }),
-  getEditingSites: (build: string, gene_id: string) => 
-    fetcher<RNAEditingSite[]>(`/rna/editing/${gene_id}`, { build }),
 };
 
 export const proteinsApi = {
   getSizeStats: (build: string) => fetcher<ProteinStats>("/proteins/stats/size", { build }),
-  getComposition: (build: string, mitochondrial?: boolean) => 
-    fetcher<AminoAcidComposition[]>("/proteins/stats/composition", { build, ...(mitochondrial !== undefined ? { mitochondrial } : {}) }),
-  getTerminalComposition: (build: string, params: { terminal?: 'N' | 'C', k?: number } = {}) => 
-    fetcher<AminoAcidComposition[]>("/proteins/stats/terminal", { build, ...params }),
+  // The backend takes no mitochondrial / terminal / k parameters (they were silently ignored).
+  getComposition: (build: string) => 
+    fetcher<AminoAcidComposition[]>("/proteins/stats/composition", { build }),
+  getTerminalComposition: (build: string) => 
+    fetcher<TerminalComposition[]>("/proteins/stats/terminal", { build }),
   getLargest: (build: string, limit = 10) => 
     fetcher<ProteinBase[]>("/proteins/top/largest", { build, limit }),
   getHomopolymerTracts: (build: string, params: { min_length?: number, limit?: number } = {}) => 
     fetcher<HomopolymerTract[]>("/proteins/tracts/homopolymers", { build, ...params }),
   getRich: (build: string, params: { aa: string, threshold?: number, limit?: number }) => 
     fetcher<ProteinBase[]>("/proteins/rich", { build, ...params }),
-  getProtein: (build: string, id: string) => fetcher<ProteinBase>(`/proteins/${id}`, { build }),
 };
 
 export const systemApi = {

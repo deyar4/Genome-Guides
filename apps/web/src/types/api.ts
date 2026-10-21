@@ -345,6 +345,15 @@ export interface AminoAcidComposition {
   percentage: number;
 }
 
+export interface TerminalComposition {
+  amino_acid: string;
+  n_terminal_count: number;
+  n_terminal_pct: number;
+  c_terminal_count: number;
+  c_terminal_pct: number;
+  n_to_c_bias_ratio: number | null;
+}
+
 export interface ProteinBase {
   protein_id: string;
   gene_id: string;
@@ -353,6 +362,11 @@ export interface ProteinBase {
   sequence: string;
   length: number;
   is_mitochondrial: boolean;
+  // only on /proteins/rich
+  distinct_amino_acids?: number;
+  dominant_amino_acid?: string | null;
+  dominant_frequency_pct?: number;
+  shannon_entropy?: number;
 }
 
 export interface HomopolymerTract {
@@ -409,6 +423,7 @@ export interface TrackDataResponse<T = Record<string, unknown>> {
 export interface KmerFrequency {
   kmer: string;
   count: number;
+  /** percent (0-100) of all k-mers, not a fraction */
   frequency: number;
 }
 
