@@ -5,6 +5,32 @@ raw_dir: "data/raw"
 interim_dir: "data/interim"
 tracks_dir: "data/tracks"
 
+# Reference inputs (D1, D18). sha256 = hash of the bytes written to data/raw (after gunzip for the FASTA), taken from the
+# files that produced the thesis results (trust on first use, 2026-10-21; not upstream-published checksums).
+# scripts/common/fetch_verified.py refuses to create the output when the hash differs.
+reference:
+  chrm_fasta:  # UCSC hg38 chrM: development smoke test only (D30), never feeds thesis numbers
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chrM.fa.gz"
+    sha256: "03a7248a919bf68ed2bd9e779e064501d15b8e83f53cc456d529aa4edc3cd3ac"
+  t2t_fasta:
+    url: "https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz"
+    sha256: "15a4ba1246f6021a89699bf5083da7f2bad3f79c86acd7bc1eb0ca3a13164e85"
+  t2t_gtf:
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/genes/hs1.ncbiRefSeq.gtf.gz"
+    sha256: "d7c2989ca3e0602b7d46d52e42ed85ad1d03be4e8a25e04df2457f74e0e1bb74"
+  t2t_centromeres:  # GenomeFeature annotation (SD, SAT, CEN, TEL, rDNA), not only centromeres
+    url: "https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_GenomeFeature_v1.0.bed"
+    sha256: "aa03b92a2c7d66492e6b82d333cf7ef364f699ce8ecf238be4bdda7717331d66"
+  t2t_telomeres:
+    url: "https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_telomere.bed"
+    sha256: "740f65e772bbbfc7e96d0f03b589a492b887aeb1a153b633cd308fcfcce5fdad"
+  t2t_protein:
+    url: "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/009/914/755/GCF_009914755.1_T2T-CHM13v2.0/GCF_009914755.1_T2T-CHM13v2.0_protein.faa.gz"
+    sha256: "e91e007af2497ecf52916b1dffaee3ec8b39e3688de1f8a5b3d998abbe7ecaf8"
+  t2t_repeatmasker:
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/hs1.repeatMasker.out.gz"
+    sha256: "c90541b64bb236ce53f3fa7d9081084475c37c053fff68d800c2abc6fcaf1193"
+
 defaults:
   # 1 kb balances local sequence variation against browser-scale track size.
   window_size: 1000

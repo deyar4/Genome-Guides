@@ -1,36 +1,31 @@
 name: genome-guides
+# Pinned to the versions installed on the reference machine on 2026-10-21 (D18). `defaults` is dropped (D18).
+# One source of truth per dependency: backend Python packages (FastAPI, DuckDB client, ...) live in apps/backend/pyproject.toml
+# + uv.lock only; Redis/Celery/SQLAlchemy/Alembic are removed (D19). The exact solved set is in environment.lock.yml.
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
-  - python=3.11
-  - nodejs=24
-  - pnpm>=9.0
+  - python=3.11.16
+  - nodejs=24.21.0
+  - pnpm=12.4.1
   # CLI Bio tools
-  - seqkit>=2.8.0
-  - samtools>=1.19
-  - bedtools>=2.31
-  - datamash>=1.8
+  - seqkit=2.13.0
+  - samtools=1.24
+  - bedtools=2.31.1
+  - datamash=1.9
   # hecate is built from a pinned upstream commit (D32). Rust is pinned so builds from this env are comparable;
   # the C compiler with OpenMP (libgomp) is taken from the system (upstream INSTALL), not from conda.
   - rust=1.99.0
-  # Data & Backend core
-  - pyarrow>=14.0
-  - duckdb>=0.9
-  - pandas>=2.1
-  - polars>=1.0
-  - pyyaml>=6.0
-  - pip
+  # Pipeline scripts (numpy is imported directly by process_hecate_mprob.py)
+  - numpy=2.4.6
+  - pyarrow=25.0.0
+  - duckdb=1.5.5
+  - pandas=3.0.5
+  - polars=1.44.1
+  - pyyaml=6.0.3
+  - pytest=9.1.1
+  - pip=26.2.1
   - pip:
-      - snakemake
-      - uv>=0.1.0
-      - fastapi>=0.110.0
-      - uvicorn[standard]>=0.28.0
-      - sqlalchemy>=2.0.0
-      - pydantic>=2.6.0
-      - pydantic-settings>=2.2.0
-      - alembic>=1.13.0
-      - celery>=5.3.6
-      - redis>=5.0.0
-      - python-json-logger>=2.0.7
+      - snakemake==9.27.0
+      - uv==0.12.15

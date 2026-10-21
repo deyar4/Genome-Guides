@@ -29,6 +29,7 @@ backend-dev:
 
 test:
 	$(RUN) python3 packages/pipeline/scripts/tests/test_pipeline.py
+	$(RUN) python3 -m pytest -q packages/pipeline/scripts/tests
 	cd apps/backend && $(RUN) uv run pytest
 
 # Smoke-test outputs only; the t2t tracks and .snakemake metadata are kept.
