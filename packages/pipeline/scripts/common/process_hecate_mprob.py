@@ -8,13 +8,24 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from resource_args import add_resource_args, effective_memory_mb
 
+def stream_pad_indices(contigs):
+    """Stream indices of the pad entry hecate logs after each odd-length record.
+
+    Four-bit packing stores two bases per byte, so a record of n bases yields
+    n + (n mod 2) logged probabilities; the extra one is the last of the record.
+    """
+    ends = np.cumsum([n + n % 2 for _, n in contigs], dtype=np.int64)
+    odd = np.array([n % 2 == 1 for _, n in contigs], dtype=bool)
+    return ends[odd] - 1
+
+
 def process_mprob(
     fai_path,
     xz_path,
     out_path,
     window_size=1000,
     chunk_windows=1000,
-    symbols_per_base=2,
+    symbols_per_base=1,
 ):
     if window_size < 1:
         raise ValueError("window size must be at least 1")
@@ -44,6 +55,8 @@ def process_mprob(
     except (OSError, ValueError, pd.errors.ParserError) as exc:
         raise SystemExit(f"Error: Cannot read Hecate probability stream '{xz_path}': {exc}") from exc
 
+    pad_idx = stream_pad_indices(contigs)
+    stream_pos = 0
     contig_idx = 0
     pos_in_contig = 0
     pending_p = np.empty(0, dtype=float)
@@ -65,6 +78,9 @@ def process_mprob(
     try:
         for chunk in chunk_iterator:
             raw_probs = chunk["prob"].to_numpy()
+            in_chunk = pad_idx[(pad_idx >= stream_pos) & (pad_idx < stream_pos + len(raw_probs))]
+            raw_probs = np.delete(raw_probs, in_chunk - stream_pos)
+            stream_pos += len(chunk)
             if symbols_per_base > 1:
                 raw_probs = np.concatenate((pending_symbols, raw_probs))
                 complete_symbols = (
@@ -79,8 +95,6 @@ def process_mprob(
             else:
                 probs = raw_probs
 
-            # Four-bit Hecate packs each nucleotide into two modeled nibbles;
-            # their product is the joint per-base probability.
             with np.errstate(divide="ignore"):
                 entropies = -np.log2(probs)
             entropies = np.clip(entropies, 0, 20.0)
@@ -149,6 +163,10 @@ def process_mprob(
                 writer.write_table(pa.table(records, schema=arrow_schema))
     finally:
         writer.close()
+    if contig_idx != len(contigs) or pos_in_contig:
+        raise ValueError(
+            f"Probability stream ended early: {contig_idx} of {len(contigs)} contigs complete"
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -159,8 +177,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--symbols-per-base",
         type=int,
-        default=2,
-        help="Modeled Hecate symbols per nucleotide (default: 2 for four-bit mode)",
+        default=1,
+        help="Logged Hecate probabilities per nucleotide (default: 1, see audit S1)",
     )
     parser.add_argument(
         "--chunk-windows",
