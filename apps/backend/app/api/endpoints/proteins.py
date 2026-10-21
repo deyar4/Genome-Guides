@@ -109,7 +109,7 @@ def get_rich(
     build: str,
     aa: str,
     threshold: float = 15,
-    limit: int = 50,
+    limit: int = Query(50, gt=0, le=1000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = track_service.data_dir / "tracks" / build / "all" / "protein_richness.parquet"
@@ -119,11 +119,11 @@ def get_rich(
         SELECT protein_id, length, distinct_amino_acids, dominant_amino_acid,
                dominant_frequency_pct, shannon_entropy
         FROM read_parquet('{path}')
-        WHERE UPPER(dominant_amino_acid) = '{aa.upper()}'
-          AND dominant_frequency_pct >= {threshold}
+        WHERE UPPER(dominant_amino_acid) = ?
+          AND dominant_frequency_pct >= ?
         ORDER BY dominant_frequency_pct DESC, length DESC
-        LIMIT {limit}
-    """)
+        LIMIT ?
+    """, [aa.upper(), threshold, limit])
     return [
         {
             "protein_id": row.get("protein_id", ""),

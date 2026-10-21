@@ -58,18 +58,21 @@ def get_clusters(
     path = track_service.data_dir / "tracks" / build / "all" / "rna_clusters.parquet"
     if not path.exists():
         return []
-    filters = []
+    filters, params = [], []
     if rna_type:
-        filters.append(f"rna_type = '{rna_type}'")
+        filters.append("rna_type = ?")
+        params.append(rna_type)
     if chrom:
-        filters.append(f"chrom = '{chrom}'")
+        filters.append("chrom = ?")
+        params.append(chrom)
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
     rows = track_service.execute_query(
         f"""SELECT cluster_id, rna_type, chrom, "start", "end", size, genes
             FROM read_parquet('{path}')
             {where}
             ORDER BY chrom, start
-            LIMIT 5000"""
+            LIMIT 5000""",
+        params,
     )
     for row in rows:
         genes = row.get("genes") or ""
@@ -92,11 +95,12 @@ def get_splice_consensus(
     path = track_service.data_dir / "tracks" / build / "all" / "splice_site_consensus.parquet"
     if not path.exists():
         return []
-    where = f"WHERE site_type = '{site_type}'" if site_type else ""
+    where = "WHERE site_type = ?" if site_type else ""
     rows = track_service.execute_query(
         f"""SELECT site_type, consensus_seq, pwm, total_sites
             FROM read_parquet('{path}') {where}
-            ORDER BY site_type"""
+            ORDER BY site_type""",
+        [site_type] if site_type else [],
     )
     for row in rows:
         pwm = row.get("pwm") or {}
@@ -119,13 +123,14 @@ def get_splice_sites(
     path = track_service.data_dir / "tracks" / build / "all" / "splice_sites.parquet"
     if not path.exists():
         return []
-    filters = []
+    filters, params = [], []
     if site_type == "donor":
         filters.append("donor_seq IS NOT NULL")
     elif site_type == "acceptor":
         filters.append("acceptor_seq IS NOT NULL")
     if chrom:
-        filters.append(f"contig = '{chrom}'")
+        filters.append("contig = ?")
+        params.append(chrom)
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
     return track_service.execute_query(
         f"""SELECT contig AS chrom, intron_start AS start, intron_end AS end,
@@ -133,5 +138,6 @@ def get_splice_sites(
                    donor_seq, acceptor_seq, is_canonical
             FROM read_parquet('{path}') {where}
             ORDER BY contig, intron_start
-            LIMIT {limit}"""
+            LIMIT {limit}""",
+        params,
     )

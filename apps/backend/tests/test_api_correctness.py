@@ -101,6 +101,13 @@ def test_chromosome_list_with_nan_skew(client):
     ("/api/v1/dna/stats/gaps", {"build": "synth", "chrom": "c1' OR '1'='1"}),
     ("/api/v1/genes/search", {"build": "synth", "q": "x' OR '1'='1"}),
     ("/api/v1/dna/stats/chromosomes", {"build": ".."}),
+    ("/api/v1/proteins/rich", {"build": "synth", "aa": "L' OR '1'='1"}),
+    ("/api/v1/rna/clusters", {"build": "synth", "rna_type": "x' OR '1'='1"}),
+    ("/api/v1/rna/splice-sites", {"build": "synth", "site_type": "x' OR '1'='1"}),
+    ("/api/v1/rna/splice-sites/records", {"build": "synth", "chrom": "x' OR '1'='1"}),
+    ("/api/v1/dna/isochores", {"build": "synth", "chrom": "x' OR '1'='1"}),
+    ("/api/v1/dna/cpg-islands", {"build": "synth", "chrom": "x' OR '1'='1"}),
+    ("/api/v1/dna/sequence/window", {"build": "synth", "chrom": "x' OR '1'='1"}),
 ])
 def test_injection_and_traversal_rejected(client, path, params):
     assert client.get(path, params=params).status_code in (404, 422)

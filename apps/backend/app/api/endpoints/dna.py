@@ -244,9 +244,10 @@ def get_gc_skew(
         f"""SELECT CAST(FLOOR(start_pos / {window_size}) * {window_size} AS BIGINT) AS start,
                    {GC_SKEW_SQL} AS gc_skew
             FROM read_parquet('{path}')
-            WHERE contig = '{chrom}'
+            WHERE contig = ?
             GROUP BY 1
-            ORDER BY 1"""
+            ORDER BY 1""",
+        [chrom],
     )
     return rows
 
@@ -258,7 +259,7 @@ def get_gaps(
 ):
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "assembly_gaps.parquet"
-        res = track_service.execute_query(f"SELECT * FROM read_parquet('{path}') WHERE contig = '{chrom}'")
+        res = track_service.execute_query(f"SELECT * FROM read_parquet('{path}') WHERE contig = ?", [chrom])
         gaps = []
         for r in res:
             gaps.append(AssemblyGapHit(
@@ -283,10 +284,12 @@ def get_cpg_islands(
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "cpg_islands.parquet"
         query = f"SELECT * FROM read_parquet('{path}') WHERE is_cpg_island = 1"
+        params = []
         if chrom:
-            query += f" AND contig = '{chrom}'"
+            query += " AND contig = ?"
+            params.append(chrom)
         query += " LIMIT 1000"
-        res = track_service.execute_query(query)
+        res = track_service.execute_query(query, params)
         islands = []
         for r in res:
             islands.append(CpGIslandHit(
@@ -437,11 +440,12 @@ def get_isochores(
     path = _read_track(track_service, build, "isochores.parquet")
     if path is None:
         return []
-    where = f"WHERE chrom = '{chrom}'" if chrom else ""
+    where = "WHERE chrom = ?" if chrom else ""
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", gc_content, isochore_class
             FROM read_parquet('{path}') {where}
-            ORDER BY chrom, "start" """
+            ORDER BY chrom, "start" """,
+        [chrom] if chrom else [],
     )
 
 @router.get("/sequence/window")
@@ -465,9 +469,10 @@ def get_sequence_window(
                    {GC_PCT_SQL} AS gc_content,
                    {GC_SKEW_SQL} AS gc_skew
             FROM read_parquet('{path}')
-            WHERE contig = '{chrom}' AND start_pos < {upper} AND end_pos > {start}
+            WHERE contig = ? AND start_pos < {upper} AND end_pos > {start}
             GROUP BY 1, 2
             ORDER BY 1
-            LIMIT {limit}"""
+            LIMIT {limit}""",
+        [chrom],
     )
     return rows
