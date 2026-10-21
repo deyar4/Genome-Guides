@@ -72,7 +72,7 @@ export default function GeneSpacingPage() {
           <TabsContent value="spacing" className="mt-0 space-y-6">
              <SectionHeader 
                title="Gene Deserts & Clusters" 
-               subtitle="The physical distance between adjacent genes on the same chromosome."
+               subtitle="The 100 largest gaps between adjacent genes on the selected chromosome (the API returns at most the 1,000 largest per chromosome), sorted by distance."
              />
              <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                <Table>
@@ -110,8 +110,8 @@ export default function GeneSpacingPage() {
 
           <TabsContent value="overlaps" className="mt-0 space-y-6">
              <SectionHeader 
-               title="Intersecting Transcripts" 
-               subtitle="Genes that physically overlap on the same or opposite strands."
+               title="Overlapping Genes" 
+               subtitle="Gene pairs that physically overlap on the same or opposite strands: the first 100 in alphabetical order of gene ID (the API returns at most 1,000 per chromosome), not ranked."
              />
              <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                <Table>

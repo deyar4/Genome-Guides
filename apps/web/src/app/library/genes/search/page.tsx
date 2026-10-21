@@ -50,7 +50,7 @@ export default function GeneSearchPage() {
   return (
     <LibraryShell 
       title="Gene Registry Search" 
-      subtitle="Search the genomic catalog by gene name or Ensembl identifier."
+      subtitle="Search the genomic catalog by gene symbol or gene ID."
     >
       <div className="flex flex-col lg:flex-row gap-12 pb-20">
         
@@ -110,7 +110,7 @@ export default function GeneSearchPage() {
             </div>
             <input 
               type="text" 
-              placeholder="e.g. BRCA1, TP53, ENSG00000139618..."
+              placeholder="e.g. BRCA1, TP53, VAMP7..."
               className="w-full h-16 bg-white dark:bg-zinc-900 border-2 border-slate-100 dark:border-zinc-800 rounded-[1.25rem] pl-14 pr-16 text-xl font-medium focus:border-primary/30 focus:ring-4 focus:ring-primary/5 transition-all outline-none shadow-sm placeholder:text-slate-300 dark:placeholder:text-zinc-700"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -212,7 +212,7 @@ export default function GeneSearchPage() {
              <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-4 items-start">
                 <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-blue-700/70 dark:text-blue-400/70 leading-relaxed italic">
-                  The registry includes both canonical genes and predicted features. For highly precise results, use Ensembl Gene IDs (starting with ENSG) to avoid ambiguity with common gene symbols.
+                  The registry includes both canonical genes and predicted features. Gene IDs in this annotation are gene symbols (or LOC identifiers); Ensembl IDs are not indexed.
                 </p>
              </div>
           )}

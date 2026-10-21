@@ -81,7 +81,7 @@ export default function GeneArchitecturePage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Genomic Leaderboards" 
-              subtitle="The outliers and giants that define the physical limits of the assembly."
+              subtitle="Largest gene records by span and by exon count, as served by the API. Caution: entries whose span exceeds their chromosome (the chrY entries at the top) merge same-ID genes from several loci (e.g. PAR genes on chrX and chrY); this is a known data issue, not biology."
             />
             <div className="px-3 py-1 bg-amber-50 dark:bg-amber-900/20 rounded-full border border-amber-100 dark:border-amber-800 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest flex items-center gap-2">
                <Trophy className="h-3 w-3" />
@@ -190,7 +190,7 @@ export default function GeneArchitecturePage() {
               <div>
                  <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Scale Variation</h4>
                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   While the average human gene is ~30kb, some like **DMD (Dystrophin)** span over 2 megabases, taking the cell several hours to transcribe a single molecule.
+                   While the average human gene is ~30kb, some like DMD (Dystrophin) span over 2 megabases, taking the cell several hours to transcribe a single molecule.
                  </p>
               </div>
            </div>

@@ -47,10 +47,14 @@ export default function GeneCorrelationsPage() {
   return (
     <LibraryShell 
       title="Genomic Correlations" 
-      subtitle="Statistical analysis of structural relationships across the genome."
+      subtitle="Descriptive correlation coefficients (r) between structural gene features."
     >
       <div className="space-y-12 pb-20">
-        
+        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300 leading-relaxed">
+          Read these as descriptive only. The API provides no p-value. The exon-count and UTR coefficients use at most 5,000 transcript records
+          (the exon-count sample is the first 5,000 ordered by gene ID, not a random sample), and transcripts of the same gene share the same gene span,
+          so the points are not independent. The density plot bins genes by 1 Mb start coordinate without separating chromosomes.
+        </div>
         {/* HERO METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <GenomicMetricCard 

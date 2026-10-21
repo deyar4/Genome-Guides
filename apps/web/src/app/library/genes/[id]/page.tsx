@@ -22,6 +22,7 @@ export default function GeneFactSheetPage() {
   const params = useParams();
   const id = params.id as string;
   const { activeGenome } = useGenomeStore();
+  const [showAllTranscripts, setShowAllTranscripts] = React.useState(false);
 
   const { data: gene, isLoading } = useQuery({
     queryKey: ['gene', activeGenome, id],
@@ -106,7 +107,7 @@ export default function GeneFactSheetPage() {
              <GeneArchitectureTrack 
                geneStart={gene.start} 
                geneEnd={gene.end} 
-               transcripts={gene.transcripts} 
+               transcripts={showAllTranscripts ? gene.transcripts : gene.transcripts.slice(0, 20)} 
                strand={gene.strand} 
              />
           </Card>
@@ -136,7 +137,7 @@ export default function GeneFactSheetPage() {
           </div>
 
           <div className="space-y-12">
-            {gene.transcripts.map((transcript: Transcript) => (
+            {(showAllTranscripts ? gene.transcripts : gene.transcripts.slice(0, 20)).map((transcript: Transcript) => (
               <Card key={transcript.transcript_id} className="overflow-hidden border-slate-200 dark:border-zinc-800 shadow-sm group">
                 <div className="p-6 bg-slate-50 dark:bg-zinc-900/50 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -153,7 +154,6 @@ export default function GeneFactSheetPage() {
                       </div>
                     </div>
                   </div>
-                  <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] font-bold uppercase tracking-widest px-3 py-1">Primary Model</Badge>
                 </div>
                 
                 <CardContent className="p-0">
@@ -161,7 +161,7 @@ export default function GeneFactSheetPage() {
                     <TableHeader className="bg-white dark:bg-zinc-950 border-b">
                       <TableRow>
                         <TableHead className="w-24 pl-6">Exon</TableHead>
-                        <TableHead>Genomic Coordinates</TableHead>
+                        <TableHead>Genomic Coordinates (0-based, [start, end))</TableHead>
                         <TableHead className="text-right pr-6">Length</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -183,6 +183,14 @@ export default function GeneFactSheetPage() {
               </Card>
             ))}
           </div>
+          {gene.transcripts.length > 20 && (
+            <button
+              className="mt-6 text-xs font-bold text-primary underline"
+              onClick={() => setShowAllTranscripts(v => !v)}
+            >
+              {showAllTranscripts ? 'Show first 20 transcripts only' : `Show all ${gene.transcripts.length} transcripts`}
+            </button>
+          )}
         </section>
 
         {/* ACADEMIC FOOTER */}
@@ -201,11 +209,11 @@ export default function GeneFactSheetPage() {
               </div>
               <div className="grid grid-cols-2 gap-6">
                  <div className="p-6 bg-primary-foreground/5 rounded-2xl border border-primary-foreground/10">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Exon Count</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Exon Count (first transcript)</div>
                     <div className="text-3xl font-mono font-bold">{gene.transcripts[0]?.exons.length || 0}</div>
                  </div>
                  <div className="p-6 bg-primary-foreground/5 rounded-2xl border border-primary-foreground/10">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Coding Span</div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Summed Exon Length, bp (first transcript)</div>
                     <div className="text-3xl font-mono font-bold text-emerald-400">
                        {formatNumber(gene.transcripts[0]?.exons.reduce((acc, e) => acc + (e.end - e.start), 0) || 0)}
                     </div>

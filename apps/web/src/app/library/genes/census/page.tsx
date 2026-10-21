@@ -54,7 +54,7 @@ export default function GeneCensusPage() {
            <GenomicMetricCard 
              label="Total Features"
              value={summary?.total_genes ? formatNumber(summary.total_genes) : '...'}
-             description="Total unique genes and transcripts annotated."
+             description="Total annotated genes (gene models)."
              color="#3b82f6"
            />
            <GenomicMetricCard 
@@ -127,7 +127,7 @@ export default function GeneCensusPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Genomic Leaderboards" 
-              subtitle="The extremes of human genetics—ranking features by scale and complexity."
+              subtitle="Largest gene records by span and by exon count, as served by the API. Caution: entries whose span exceeds their chromosome (the chrY entries at the top) merge same-ID genes from several loci (e.g. PAR genes on chrX and chrY); this is a known data issue, not biology."
             />
             <div className="px-3 py-1 bg-amber-50 dark:bg-amber-900/20 rounded-full border border-amber-100 dark:border-amber-800 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest flex items-center gap-2">
                <Trophy className="h-3 w-3" />
@@ -196,7 +196,7 @@ export default function GeneCensusPage() {
            <div className="space-y-2">
               <h4 className="font-bold text-slate-900 dark:text-zinc-100 uppercase text-xs tracking-widest">Understanding Biotypes</h4>
               <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-3xl">
-                Biotypes classify genomic features based on their biological properties. While **protein-coding** genes are the most well-known, the human genome is rich in **non-coding RNA** (lncRNA, snRNA, etc.) and **pseudogenes**—evolutionary relics that provide insight into genomic history and regulation.
+                Biotypes classify genomic features based on their biological properties. While protein-coding genes are the most well-known, the human genome is rich in non-coding RNA (lncRNA, snRNA, etc.) and pseudogenes—evolutionary relics that provide insight into genomic history and regulation.
               </p>
            </div>
         </div>

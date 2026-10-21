@@ -44,7 +44,14 @@ export default function GeneDistributionPage() {
         chromosome: c.chrom.replace('chr', ''),
         density: c.gene_count,
         normalized: c.density,
-      }));
+      }))
+      .sort((a, b) => a.chromosome.localeCompare(b.chromosome, undefined, { numeric: true }));
+  }, [chromStats]);
+
+  const densityExtremes = useMemo(() => {
+    if (!chromStats || chromStats.length === 0) return null;
+    const sorted = [...chromStats].filter(c => !c.chrom.includes('_')).sort((a, b) => b.density - a.density);
+    return { hi: sorted[0], lo: sorted[sorted.length - 1] };
   }, [chromStats]);
 
   const cpgPieData = useMemo(() => {
@@ -129,7 +136,7 @@ export default function GeneDistributionPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Promoter CpG Islands" 
-              subtitle="Genes associated with CpG islands in their promoter regions (-2000bp to +200bp of TSS)."
+              subtitle="Genes with a CpG record within 2,000 bp of the annotated gene start (definition from the API response note)."
             />
             <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-full border border-emerald-100 dark:border-emerald-800 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                <Anchor className="h-3 w-3" />
@@ -158,7 +165,7 @@ export default function GeneDistributionPage() {
                      </div>
                      <div className="mt-4 text-center">
                         <div className="text-3xl font-mono font-bold text-slate-900 dark:text-zinc-100">{cpgAssoc.percentage.toFixed(1)}%</div>
-                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Promoters with CpG</div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Genes with CpG nearby</div>
                      </div>
                   </>
                ) : (
@@ -173,7 +180,7 @@ export default function GeneDistributionPage() {
                      <TableHead>Biotype</TableHead>
                      <TableHead className="text-right">With CpG</TableHead>
                      <TableHead className="text-right">Total Genes</TableHead>
-                     <TableHead className="text-right">Enrichment %</TableHead>
+                     <TableHead className="text-right">% with CpG</TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
@@ -209,7 +216,7 @@ export default function GeneDistributionPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Nested Gene Discoveries" 
-              subtitle="Rare instances where small genes (guests) reside entirely within the introns of larger genes (hosts)."
+              subtitle="Small genes (guests) that reside entirely within the introns of larger genes (hosts)."
             />
             <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-full border border-emerald-100 dark:border-emerald-800 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                <Fingerprint className="h-3 w-3" />
@@ -232,7 +239,9 @@ export default function GeneDistributionPage() {
                 {nestedLoading ? (
                   [...Array(10)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><div className="h-10 w-full bg-slate-50 dark:bg-zinc-900/50 animate-pulse rounded" /></TableCell></TableRow>)
                 ) : (
-                  nested?.sample.slice(0, 15).map((pair, i) => (
+                  nested && nested.total_pairs === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">Nested-gene detection is not available: the API endpoint returns a placeholder (0 pairs), which is not a measured result.</TableCell></TableRow>
+                  ) : nested?.sample.slice(0, 15).map((pair, i) => (
                     <TableRow key={i} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors group">
                       <TableCell>
                          <div className="flex flex-col">
@@ -284,7 +293,9 @@ export default function GeneDistributionPage() {
               <div>
                  <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Gene Richness</h4>
                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   Gene density varies significantly across chromosomes. **Chromosome 19** is exceptionally gene-rich (~23 genes/Mb), while **Chromosome 13** and **18** are relatively gene-poor.
+                   {densityExtremes
+                     ? `Gene density (genes per Mb) varies across chromosomes: highest on ${densityExtremes.hi.chrom} (${densityExtremes.hi.density.toFixed(1)}), lowest on ${densityExtremes.lo.chrom} (${densityExtremes.lo.density.toFixed(1)}).`
+                     : 'Gene density varies across chromosomes.'}
                  </p>
               </div>
            </div>

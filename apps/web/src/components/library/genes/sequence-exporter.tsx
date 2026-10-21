@@ -23,7 +23,7 @@ export function SequenceExporter({ chrom, start, end, geneName }: SequenceExport
     setLoading(true);
     try {
       const seq = await dnaApi.getSequence(activeGenome, chrom, start, end);
-      const fasta = `>${activeGenome}_${chrom}:${start}-${end} [gene=${geneName}]\n${seq}`;
+      const fasta = `>${activeGenome}_${chrom}:${start}-${end} [gene=${geneName}] [forward reference strand, 0-based half-open]\n${seq}`;
       const blob = new Blob([fasta], { type: 'text/plain' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
