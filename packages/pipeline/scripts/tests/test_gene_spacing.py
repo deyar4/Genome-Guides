@@ -24,3 +24,16 @@ def test_adjacent_genes_are_spacing_zero_not_overlap(tmp_path):
         "SELECT gene1_id, gene2_id, overlap_len FROM read_parquet(?)", [str(tmp_path / "out/gene_overlaps.parquet")]).fetchall()}
     assert spacing == {("a", "b"): 0, ("b", "c"): 0, ("d", "e"): 100}
     assert overlaps == {("c", "d"): 50}
+
+
+def test_nested_gene_limitation_is_documented_behaviour(tmp_path):
+    """Pins the 'adjacent by start' definition: C lies inside A, yet (B,C) is reported as spacing 200 from B's end."""
+    src = tmp_path / "gm.parquet"
+    con = duckdb.connect()
+    con.execute("""COPY (SELECT * FROM (VALUES
+        ('c1', 100, 1000, 'A', '+'), ('c1', 200, 300, 'B', '+'), ('c1', 500, 600, 'C', '+')
+    ) t(contig, start_pos, end_pos, gene_id, strand)) TO '%s' (FORMAT PARQUET)""" % src)
+    process_spacing(str(src), str(tmp_path / "out"))
+    ov = con.execute("SELECT gene1_id, gene2_id, overlap_len FROM read_parquet(?)", [str(tmp_path / "out/gene_overlaps.parquet")]).fetchall()
+    sp = con.execute("SELECT gene1_id, gene2_id, intergenic_dist FROM read_parquet(?)", [str(tmp_path / "out/gene_spacing.parquet")]).fetchall()
+    assert ov == [("A", "B", 800)] and sp == [("B", "C", 200)]

@@ -3,7 +3,7 @@ import duckdb
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
 from app.schemas.track import TrackDataResponse
-from app.core.track_meta import TRACK_METADATA
+from app.core.track_meta import BINNING_NOTES, TRACK_METADATA
 from app.core.validation import InvalidTrackRequest
 import logging
 
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/metadata")
 def get_track_metadata():
     """Definitions (units, log base, window, weighting) of the window tracks, D17."""
-    return TRACK_METADATA
+    return {**TRACK_METADATA, "binning": BINNING_NOTES}
 
 
 @router.get("/{genome}/{contig}/{track_name}", response_model=TrackDataResponse)

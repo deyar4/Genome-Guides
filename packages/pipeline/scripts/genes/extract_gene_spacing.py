@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Calculate intergenic distances and overlapping gene pairs."""
+"""Calculate intergenic distances and overlapping gene pairs.
+
+Definition: genes on a contig are sorted by (start, gene_id) and each is paired with the NEXT gene by start. Half-open
+intervals: next.start >= end -> spacing next.start - end (0 when adjacent); next.start < end -> overlap of end - next.start.
+LIMITATION (audit review): the comparison uses the preceding gene's own end, not the running maximum end. For a gene nested
+inside a longer one, overlap_len can exceed the nested gene's length and the following gap is measured from the nested gene.
+This is "adjacent by start", not "distance to the covered span"; decide before using it for spacing statistics (OPEN_QUESTIONS).
+"""
 
 import argparse
 from pathlib import Path

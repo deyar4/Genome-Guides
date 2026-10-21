@@ -19,6 +19,16 @@ WEIGHT_COLUMN: Dict[str, str] = {
 # Columns that are counts: binned as a sum (sum_<col>) in addition to the per-window mean.
 COUNT_COLUMNS = {"count", "te_count", "telomeric_repeats", "n_valid", "n_acgt"}
 
+# Semantics shared by all binned responses (documented here because they are not column-specific).
+BINNING_NOTES = [
+    "A bin covers the windows that overlap the requested [start, end); n_windows says how many. The first and last bin of a "
+    "non-aligned request can therefore hold fewer windows than bin_size/window.",
+    "min_* / max_* are the smallest / largest value of a single 1 kb window inside the bin, not of a bin-level statistic.",
+    "avg_min_* / avg_max_* (hecate_mprob) are weighted means of per-window minima / maxima of the per-base probability; "
+    "they are not a bin minimum or maximum.",
+    "n_null_<col> counts windows whose value is missing (NULL/NaN); they are excluded from the average, never counted as 0.",
+]
+
 TRACK_METADATA: Dict[str, Dict[str, Any]] = {
     "gc_content": {
         "window_bp": 1000,
@@ -32,7 +42,7 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
         "columns": {
             "avg_shannon_entropy": (
                 "Mean of per-window Shannon entropy of the A/C/G/T composition, log base 2, bits (0..2), "
-                "weighted by n_acgt. A window has NULL entropy when n_acgt < 500 (D33). "
+                "weighted by n_acgt. A window has NULL entropy when n_acgt < min_acgt_fraction * window_size (= 500 with the current config, D33). "
                 "This is the entropy of base composition, not a model-based quantity."
             ),
         },
@@ -47,7 +57,7 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
                 "NOT Shannon entropy of composition."
             ),
             "avg_mean_prob": "Mean of P(x_i | context) per window (probability, 0..1), weighted by n_valid. Not a surprisal.",
-            "min_mean_entropy / max_mean_entropy": "Smallest and largest window value inside the bin.",
+            "min_mean_entropy / max_mean_entropy": "Smallest and largest per-window value inside the bin.",
         },
     },
 }

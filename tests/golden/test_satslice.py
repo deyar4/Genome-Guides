@@ -52,7 +52,39 @@ def test_matches_golden():
 
 def test_satellite_is_more_predictable_than_unique_sequence():
     """Expected biology (ASSUMPTION, adaptive model): the tandem array has lower cross-entropy than the genome-wide
-    mean of 1.55 bits/base. Not a threshold on a specific value, only a sanity direction."""
+    mean of 1.546 bits/base (n_valid-weighted mean of hecate_mprob.mean_entropy of the full T2T run, HANDOFF 2026-10-21, LOGBOOK
+    full-run entry). Direction only, not a value."""
     r = rows()
     mean = sum(x[6] for x in r) / len(r)
-    assert mean < 1.55
+    assert mean < 1.546
+
+
+def _reference_windows():
+    """Independent pure-Python reference computed from the fixture FASTA, not from any pipeline output."""
+    import math
+    seq = "".join(l.strip() for l in (ROOT / "tests/fixtures/satslice.fa").read_text().splitlines()[1:]).upper()
+    assert len(seq) == 999_999
+    for start in range(0, len(seq), 1000):
+        w = seq[start:start + 1000]
+        c = {b: w.count(b) for b in "ACGT"}
+        tot = sum(c.values())
+        gc = 100.0 * (c["G"] + c["C"]) / tot
+        ent = None if tot < 500 else -sum(n / tot * math.log2(n / tot) for n in c.values() if n)
+        skew = None if c["G"] + c["C"] == 0 else 100.0 * (c["G"] - c["C"]) / (c["G"] + c["C"])
+        yield start, gc, skew, ent
+
+
+def test_gc_skew_entropy_match_independent_reference():
+    got = {r[0]: r for r in rows()}
+    n = 0
+    for start, gc, skew, ent in _reference_windows():
+        r = got[start]
+        assert r[2] == pytest.approx(gc, abs=6e-3), start        # window gc_pct is stored rounded to 2 decimals (seqkit)
+        assert (r[3] is None) == (skew is None)
+        if skew is not None:
+            assert r[3] == pytest.approx(skew, abs=6e-3), start  # window skew is stored rounded to 2 decimals (seqkit output)
+        assert (r[4] is None) == (ent is None)
+        if ent is not None:
+            assert r[4] == pytest.approx(ent, abs=2e-4), start   # rounded to 4 decimals
+        n += 1
+    assert n == 1000

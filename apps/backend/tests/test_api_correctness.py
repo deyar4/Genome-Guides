@@ -150,3 +150,16 @@ def test_summary_returns_non_window_tables(client, tmp_path):
     duckdb.connect().execute(f"COPY (SELECT 'A' AS amino_acid, 3 AS count) TO '{out}/aa.parquet' (FORMAT PARQUET)")
     r = client.get("/api/v1/summary/synth/aa")
     assert r.status_code == 200 and r.json()["data"] == [{"amino_acid": "A", "count": 3}]
+
+
+def test_metadata_threshold_agrees_with_pipeline_config(client):
+    import re
+    from pathlib import Path
+
+    import yaml
+    cfg = yaml.safe_load((Path(__file__).resolve().parents[3] / "packages/pipeline/config.yaml").read_text())
+    se = cfg["tracks"]["shannon_entropy"]
+    threshold = int(se["min_acgt_fraction"] * se["window_size"])
+    text = client.get("/api/v1/tracks/metadata").json()["shannon_entropy"]["columns"]["avg_shannon_entropy"]
+    assert f"= {threshold} with the current config" in text
+    assert "binning" in client.get("/api/v1/tracks/metadata").json()
