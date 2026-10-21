@@ -27,19 +27,14 @@ resources:
     mem_mb: 8192
 
 tracks:
-  gc_content:
-    enabled: true
-    window_size: 1000
-    step_size: 1000
+  # gc_content and the hecate cross-entropy track use a fixed 1000 bp grid (D31): `-W 1000` in trivial_cli.smk and `-w 1000`
+  # in dna.smk. They are literals, not config, so no key here can silently disagree with the results.
   shannon_entropy:
     window_size: 1000
     # Window entropy is NA when fewer than this fraction of window_size bases are A/C/G/T (audit S8).
     min_acgt_fraction: 0.5
   hecate_bwt:
-    enabled: false
-    # Match the probability track's local entropy resolution without large batches.
-    kmer_length: 21
-    window_size: 100
+    # Windows per processing batch of the hecate stream (memory knob, does not change results).
     chunk_windows: 1000
     # Pinned hecate build (D32, D35): upstream trunk 76b4836 plus packages/pipeline/patches/hecate-mprob-streaming.patch.
     # Without the patch, upstream keeps every --mprob probability in RAM (about 12.5 GB for T2T) and ran out of
@@ -60,14 +55,9 @@ tracks:
     sha256:
       linux-x86_64: "561c4cea9566088b5a0166e29b9d7c7944e44ad1c8c9a94a0e369cd4ad8b3c5d"
   ssr:
-    enabled: true
     # 1 Mb bins support genome-wide enrichment comparisons without dense output.
     window_size: 1000000
     # Four million bases bounds regex working memory on 16 GB laptops.
     chunk_bases: 4000000
-    min_period: 1
-    max_period: 6
-  isochores:
-    enabled: true
-    # Classical GC boundaries used by the L1/L2/H1/H2/H3 classification.
-    thresholds: [37, 41, 46, 53]
+  # Isochore-like classes: thresholds 37/41/46/53 (% GC) are hardcoded in scripts/dna/extract_isochores.py and applied to
+  # 1 kb windows, which is a GC-class run, not a literature isochore (audit 03 S10, open).

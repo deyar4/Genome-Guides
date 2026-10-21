@@ -55,7 +55,7 @@ def process_spacing(input_parquet: str, out_dir: str):
                 SELECT contig, gene_id AS gene1_id, next_gene_id AS gene2_id,
                     CAST(next_start_pos - end_pos AS UINTEGER) AS intergenic_dist
                 FROM ordered
-                WHERE next_start_pos IS NOT NULL AND next_start_pos > end_pos
+                WHERE next_start_pos IS NOT NULL AND next_start_pos >= end_pos
             ) TO ? (FORMAT PARQUET, COMPRESSION ZSTD)
         """, [str(out_p / "gene_spacing.parquet")])
         con.execute(f"""
@@ -65,7 +65,7 @@ def process_spacing(input_parquet: str, out_dir: str):
                     CAST(end_pos - next_start_pos AS UINTEGER) AS overlap_len,
                     CAST(strand = next_strand AS UTINYINT) AS same_strand
                 FROM ordered
-                WHERE next_start_pos IS NOT NULL AND next_start_pos <= end_pos
+                WHERE next_start_pos IS NOT NULL AND next_start_pos < end_pos
             ) TO ? (FORMAT PARQUET, COMPRESSION ZSTD)
         """, [str(out_p / "gene_overlaps.parquet")])
     except duckdb.Error as exc:
