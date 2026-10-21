@@ -139,7 +139,7 @@ rule compute_shannon_entropy:
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         bedtools makewindows -g {input.fai} -w 1000 -s 1000 | sort -k1,1 -k2,2n > {output.windows}
         bedtools nuc -fi {input.fasta} -bed {output.windows} | grep -v "^#" > {output.nuc}
-        seqkit locate -i -r -p "TTAGGG|CCCTAA" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
+        seqkit locate -P -i -r -p "TTAGGG|CCCTAA" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
         if [ ! -s {output.locs} ]; then
             awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' {output.nuc}
         else
