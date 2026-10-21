@@ -44,3 +44,12 @@ Thumbs.db
 
 # Rust build output
 target/
+
+# Compressed and binary reference genomes
+*.fa.gz
+*.fasta.gz
+*.2bit
+
+# Secrets and local environment
+.env
+.env.*
