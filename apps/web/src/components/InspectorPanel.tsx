@@ -4,7 +4,7 @@ interface InspectorPanelProps {
   hoverCoord: number | null;
   hoverData: {
     gc?: number;
-    skew?: number;
+    skew?: number | null;
     gap?: string;
     homopolymer?: string;
     entropy?: number;
@@ -12,7 +12,7 @@ interface InspectorPanelProps {
     repeatDensity?: number;
     gene?: string;
     repeat?: string;
-    hecate_mprob?: number;
+    hecate_entropy?: number | null;
   } | null;
 }
 
@@ -33,14 +33,14 @@ export function InspectorPanel({ hoverCoord, hoverData }: InspectorPanelProps) {
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Composition (GC)</div>
-                <div className="text-chart-1 font-bold mt-1">GC Content: {hoverData.gc !== undefined ? `${hoverData.gc.toFixed(2)}%` : "N/A"}</div>
-                <div className="text-chart-4 font-bold mt-1">GC Skew: {hoverData.skew !== undefined ? hoverData.skew.toFixed(4) : "N/A"}</div>
+                <div className="text-chart-1 font-bold mt-1">GC Content: {hoverData.gc != null ? `${hoverData.gc.toFixed(2)}%` : "N/A"}</div>
+                <div className="text-chart-4 font-bold mt-1">GC Skew: {hoverData.skew != null ? hoverData.skew.toFixed(4) : "N/A"}</div>
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Annotation Densities</div>
                 <div className="text-chart-2 font-bold mt-1">Gene Density: {hoverData.geneDensity !== undefined ? hoverData.geneDensity.toFixed(2) : "N/A"}</div>
                 <div className="text-chart-3 font-bold mt-1">Repeat Density: {hoverData.repeatDensity !== undefined ? hoverData.repeatDensity.toFixed(2) : "N/A"}</div>
-                <div className="text-chart-1 font-bold mt-1">Hecate Prob: {hoverData.hecate_mprob !== undefined ? hoverData.hecate_mprob.toFixed(3) : "N/A"}</div>
+                <div className="text-chart-1 font-bold mt-1">Hecate cross-entropy: {hoverData.hecate_entropy != null ? `${hoverData.hecate_entropy.toFixed(3)} bits/base` : "N/A"}</div>
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Feature Inspections</div>

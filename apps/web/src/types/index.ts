@@ -3,7 +3,7 @@ export interface TrackDataPoint {
   avg_value: number;
   min_value: number;
   max_value: number;
-  avg_skew?: number;
+  avg_skew?: number | null;
 }
 
 export interface GapFeature {
@@ -78,7 +78,8 @@ export interface TrackCache {
 
 export interface HecateMprobPoint {
   bin_start: number;
-  mean_prob: number;
-  min_prob: number;
-  max_prob: number;
+  // Cross-entropy rate in bits/base (D17), n_valid-weighted mean of the bin; null = no valid base (missing, never 0)
+  mean_entropy: number | null;
+  min_entropy: number | null;
+  max_entropy: number | null;
 }

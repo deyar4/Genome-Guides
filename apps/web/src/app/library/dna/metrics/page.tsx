@@ -190,7 +190,7 @@ export default function ChromosomeMetricsPage() {
                              </div>
                           </TableCell>
                           <TableCell className="text-right font-mono text-[11px] text-slate-400">
-                             {c.gc_skew.toFixed(3)}
+                             {c.gc_skew != null ? c.gc_skew.toFixed(3) : "N/A"}
                           </TableCell>
                           <TableCell className="text-right">
                              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-[9px] font-bold uppercase tracking-tighter text-slate-500">

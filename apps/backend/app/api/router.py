@@ -1,8 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.core.validation import validate_inputs
 
 from .endpoints import health, tracks, summary, dna, genes, rna, proteins, system
 
-api_router = APIRouter()
+api_router = APIRouter(dependencies=[Depends(validate_inputs)])
 
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(tracks.router, prefix="/tracks", tags=["tracks"])

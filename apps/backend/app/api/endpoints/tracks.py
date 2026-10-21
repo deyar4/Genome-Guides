@@ -3,24 +3,35 @@ import duckdb
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
 from app.schemas.track import TrackDataResponse
+from app.core.track_meta import TRACK_METADATA
+from app.core.validation import InvalidTrackRequest
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/metadata")
+def get_track_metadata():
+    """Definitions (units, log base, window, weighting) of the window tracks, D17."""
+    return TRACK_METADATA
+
 
 @router.get("/{genome}/{contig}/{track_name}", response_model=TrackDataResponse)
 def get_track_data(
     genome: str,
     contig: str,
     track_name: str,
-    start: int = Query(..., description="Start position (0-based, inclusive)"),
-    end: int = Query(..., description="End position (0-based, exclusive)"),
-    max_points: int = Query(500, description="Max points for downsampling"),
+    start: int = Query(..., ge=0, description="Start position (0-based, inclusive)"),
+    end: int = Query(..., gt=0, description="End position (0-based, exclusive)"),
+    max_points: int = Query(500, ge=1, le=10000, description="Max points for downsampling"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
     """
     Query a specific region for a track and optionally downsample the results.
     """
     try:
-        data = track_service.query_track_range(
+        data, truncated = track_service.query_track_range_ex(
             genome=genome,
             contig=contig,
             track_name=track_name,
@@ -35,9 +46,13 @@ def get_track_data(
             start=start,
             end=end,
             max_points=max_points,
-            data=data
+            data=data,
+            truncated=truncated,
         )
+    except InvalidTrackRequest as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query track: {exc}") from exc
+    except (duckdb.Error, OSError, ValueError):
+        logger.exception("track query failed: %s/%s/%s", genome, contig, track_name)
+        raise HTTPException(status_code=500, detail="Failed to query track")

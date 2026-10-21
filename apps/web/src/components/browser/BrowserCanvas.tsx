@@ -12,8 +12,8 @@ export interface TrackConfig {
 
 export interface HoverData {
   gc?: number;
-  skew?: number;
-  hecate_mprob?: number;
+  skew?: number | null;
+  hecate_entropy?: number | null;
 }
 
 interface BrowserCanvasProps {
@@ -229,45 +229,49 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
         else if (track.id === 'hecate' && hecateMprobData.length > 0) {
           const plotTop = currentTop + 26;
           const plotHeight = track.height - 32;
-          const yForProb = (prob: number) => plotTop + plotHeight - Math.max(0, Math.min(1, prob)) * plotHeight;
+          const maxBits = 2.5; // display scale only; values above are clamped, typical range 0 to about 2 bits/base
+          const yForBits = (bits: number) => plotTop + plotHeight - Math.max(0, Math.min(maxBits, bits)) / maxBits * plotHeight;
 
+          // min/max band of the window values inside each bin (only bins with data)
+          const valid = hecateMprobData.filter((pt) => pt.mean_entropy !== null && pt.min_entropy !== null && pt.max_entropy !== null);
+          if (valid.length > 0) {
+            ctx.beginPath();
+            valid.forEach((pt, i) => {
+              const x = bpToX(pt.bin_start);
+              const y = yForBits(pt.max_entropy as number);
+              if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+            });
+            for (let i = valid.length - 1; i >= 0; i--) {
+              ctx.lineTo(bpToX(valid[i].bin_start), yForBits(valid[i].min_entropy as number));
+            }
+            ctx.closePath();
+            ctx.fillStyle = isDark ? "rgba(56, 189, 248, 0.14)" : "rgba(3, 105, 161, 0.12)";
+            ctx.fill();
+          }
+
+          // mean line: a missing bin (null) breaks the line instead of drawing a zero
           ctx.beginPath();
-          let first = true;
+          let drawing = false;
           hecateMprobData.forEach((pt) => {
+            if (pt.mean_entropy === null) { drawing = false; return; }
             const x = bpToX(pt.bin_start);
-            const y = yForProb(pt.mean_prob);
-            if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+            const y = yForBits(pt.mean_entropy);
+            if (!drawing) { ctx.moveTo(x, y); drawing = true; } else { ctx.lineTo(x, y); }
           });
           ctx.strokeStyle = isDark ? "#38bdf8" : "#0369a1";
           ctx.lineWidth = 2;
           ctx.stroke();
 
-          ctx.beginPath();
-          first = true;
-          hecateMprobData.forEach((pt) => {
-            const x = bpToX(pt.bin_start);
-            const y = yForProb(pt.max_prob);
-            if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
-          });
-          for (let i = hecateMprobData.length - 1; i >= 0; i--) {
-            const pt = hecateMprobData[i];
-            const x = bpToX(pt.bin_start);
-            const y = yForProb(pt.min_prob);
-            ctx.lineTo(x, y);
-          }
-          ctx.closePath();
-          ctx.fillStyle = isDark ? "rgba(56, 189, 248, 0.14)" : "rgba(3, 105, 161, 0.12)";
-          ctx.fill();
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "9px monospace";
           ctx.textAlign = "right";
-          ctx.fillText("1.0", width - 8, plotTop + 9);
-          ctx.fillText("0.0", width - 8, plotTop + plotHeight);
+          ctx.fillText(`${maxBits.toFixed(1)} bits/base`, width - 8, plotTop + 9);
+          ctx.fillText("0", width - 8, plotTop + plotHeight);
         } else if (track.id === 'repeat-density' || track.id === 'hecate') {
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "10px sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(track.id === 'repeat-density' ? "No repeat density data for this contig" : "No computed Hecate probability data for this contig", width / 2, currentTop + track.height / 2 + 8);
+          ctx.fillText(track.id === 'repeat-density' ? "No repeat density data for this contig" : "No Hecate cross-entropy data for this contig", width / 2, currentTop + track.height / 2 + 8);
         }
         
         currentTop += track.height + trackPadding;
@@ -350,7 +354,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
       setHoverData({
         gc: point?.avg_value,
         skew: point?.avg_skew,
-        hecate_mprob: hecatePoint?.mean_prob
+        hecate_entropy: hecatePoint?.mean_entropy
       });
     }
 

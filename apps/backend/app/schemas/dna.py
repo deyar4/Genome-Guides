@@ -32,8 +32,8 @@ class DNAStats(BaseModel):
 class Chromosome(BaseModel):
     name: str
     length: int
-    gc_content: float
-    gc_skew: float
+    gc_content: Optional[float] = None
+    gc_skew: Optional[float] = None
     is_mitochondrial: bool
     ssr_count: int
     dinucleotides: Dict[str, int]

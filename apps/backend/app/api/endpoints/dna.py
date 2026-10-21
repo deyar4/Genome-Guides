@@ -4,6 +4,7 @@ from typing import List, Optional
 from pathlib import Path
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
+from app.core.track_meta import GC_PCT_SQL, GC_SKEW_SQL
 from app.schemas.dna import (
     DNAStats, AssemblyStats, GenomeSection,
     ChromosomeListResponse, Chromosome,
@@ -14,6 +15,11 @@ from app.schemas.dna import (
 )
 
 router = APIRouter()
+
+
+def _opt(value):
+    """NULL stays None (explicit missing), never 0."""
+    return None if value is None else float(value)
 
 
 def _track_path(track_service: DuckDBTrackService, build: str, name: str) -> Path:
@@ -117,7 +123,7 @@ def get_chromosomes(
 ):
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
-        query = f"SELECT contig as name, MAX(end_pos) as length, AVG(gc_pct) as gc_content, AVG(gc_skew) as gc_skew FROM read_parquet('{path}') GROUP BY contig"
+        query = f"SELECT contig as name, MAX(end_pos) as length, {GC_PCT_SQL} as gc_content, {GC_SKEW_SQL} as gc_skew FROM read_parquet('{path}') GROUP BY contig"
         res = track_service.execute_query(query)
         
         chroms = []
@@ -126,8 +132,8 @@ def get_chromosomes(
             chroms.append(Chromosome(
                 name=name,
                 length=int(row.get('length', 0)),
-                gc_content=float(row.get('gc_content', 0)),
-                gc_skew=float(row.get('gc_skew', 0)),
+                gc_content=_opt(row.get('gc_content')),
+                gc_skew=_opt(row.get('gc_skew')),
                 is_mitochondrial=name.lower() in ["chrm", "mt"],
                 ssr_count=0,
                 dinucleotides={"AA": 0}
@@ -226,7 +232,7 @@ def get_gc_skew(
         raise HTTPException(status_code=404, detail=f"GC content track not found for build '{build}'")
     rows = track_service.execute_query(
         f"""SELECT CAST(FLOOR(start_pos / {window_size}) * {window_size} AS BIGINT) AS start,
-                   AVG(gc_skew) AS gc_skew
+                   {GC_SKEW_SQL} AS gc_skew
             FROM read_parquet('{path}')
             WHERE contig = '{chrom}'
             GROUP BY 1
@@ -416,8 +422,8 @@ def get_sequence_window(
     rows = track_service.execute_query(
         f"""SELECT CAST(FLOOR(start_pos / {step}) * {step} AS BIGINT) AS start,
                    CAST(FLOOR(start_pos / {step}) * {step} + {step} AS BIGINT) AS end,
-                   AVG(gc_pct) AS gc_content,
-                   AVG(gc_skew) AS gc_skew
+                   {GC_PCT_SQL} AS gc_content,
+                   {GC_SKEW_SQL} AS gc_skew
             FROM read_parquet('{path}')
             WHERE contig = '{chrom}' AND start_pos < {upper} AND end_pos > {start}
             GROUP BY 1, 2

@@ -17,7 +17,7 @@ const DEFAULT_TRACKS: TrackConfig[] = [
   { id: 'repeat-density', title: 'REPEAT DENSITY', visible: true, order: 4, height: 92 },
   { id: 'gaps', title: 'ASSEMBLY GAPS / HOMOPOLYMERS', visible: true, order: 5, height: 58 },
   { id: 'models', title: 'GENE MODELS / REPEATS', visible: true, order: 6, height: 58 },
-  { id: 'hecate', title: 'HECATE M-PROBABILITY (COMPUTED 1 KB WINDOWS)', visible: true, order: 7, height: 128 }
+  { id: 'hecate', title: 'HECATE CROSS-ENTROPY RATE (BITS/BASE, 1 KB WINDOWS)', visible: true, order: 7, height: 128 }
 ];
 
 export default function GenomeBrowserPage() {

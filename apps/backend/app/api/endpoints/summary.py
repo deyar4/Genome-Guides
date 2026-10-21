@@ -3,6 +3,10 @@ import duckdb
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
 from app.schemas.track import SummaryResponse
+from app.core.validation import InvalidTrackRequest
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,10 +22,10 @@ def get_global_summary(
     try:
         data = track_service.query_track_range(
             genome=genome,
-            contig="",
+            contig="all",
             track_name=track_name,
             start_pos=0,
-            end_pos=0
+            end_pos=2**40
         )
         return SummaryResponse(
             genome=genome,
@@ -30,5 +34,8 @@ def get_global_summary(
         )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query summary: {exc}") from exc
+    except InvalidTrackRequest as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except (duckdb.Error, OSError, ValueError):
+        logger.exception("summary query failed: %s/%s", genome, track_name)
+        raise HTTPException(status_code=500, detail="Failed to query summary")

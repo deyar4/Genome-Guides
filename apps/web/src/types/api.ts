@@ -32,8 +32,8 @@ export interface DNAStats {
 export interface Chromosome {
   name: string;
   length: number;
-  gc_content: number;
-  gc_skew: number;
+  gc_content: number; // backend may send null only for an all-N contig (none in T2T)
+  gc_skew: number | null;
   is_mitochondrial: boolean;
   ssr_count: number;
   dinucleotides: Record<string, number>;
