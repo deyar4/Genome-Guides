@@ -14,6 +14,8 @@ def run_test():
     with open(tiny_fa, "w") as f:
         f.write(">chr1\nATGCATGCATGCATGCATGCATGCATGCATGCATGCATGC\n")
 
+    Path("data/interim/tiny").mkdir(parents=True, exist_ok=True)  # was missing after `make clean`
+
     # Run GC skew via seqkit sliding & fx2tab
     cmd_gc = f"seqkit sliding -g -W 10 -s 10 {tiny_fa} | seqkit fx2tab -n -g -G -H > data/interim/tiny/gc_skew.tsv"
     subprocess.run(cmd_gc, shell=True, check=True)
