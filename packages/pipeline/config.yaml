@@ -41,6 +41,16 @@ tracks:
     kmer_length: 21
     window_size: 100
     chunk_windows: 1000
+    # Pinned upstream build (D32). The binary is not tracked in git; the workflow checks its sha256 before every use
+    # and builds it from the pinned commit if it is absent. The reported version is "1.0" for every commit, so the
+    # commit and hash are the only identity.
+    repo: "https://gitlab.com/rahmannlab/hecate.git"
+    commit: "76b48360b52130b9e6149a1c90984d4ed74757f3"
+    binary: "tools/hecate/hecate"
+    # sha256 of the binary per platform. Built with packages/pipeline/scripts/common/build_hecate.sh, which makes
+    # the build path-independent (same hash from any directory).
+    sha256:
+      linux-x86_64: "2158e234b4df9e0da86c124654fb7df195965a66f7b848c7be4930d346a63647"
   ssr:
     enabled: true
     # 1 Mb bins support genome-wide enrichment comparisons without dense output.

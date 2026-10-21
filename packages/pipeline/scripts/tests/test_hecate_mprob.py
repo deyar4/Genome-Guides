@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(ROOT / "packages/pipeline/scripts/common"))
 from process_hecate_mprob import process_mprob, stream_pad_indices  # noqa: E402
 
-HECATE = ROOT / "packages/hecate/target/release/hecate"
+HECATE = ROOT / "tools/hecate/hecate"
 CONTIGS = [("c1", 1001), ("c2", 500), ("c3", 777), ("c4", 4)]  # odd, even, odd, even
 
 
@@ -80,7 +80,7 @@ def test_short_stream_raises(tmp_path):
         process_mprob(fai, tmp_path / "p.txt", tmp_path / "o.parquet", window_size=100)
 
 
-@pytest.mark.skipif(not HECATE.exists(), reason="hecate binary not built")
+@pytest.mark.skipif(not HECATE.exists(), reason="pinned hecate binary not built (tools/hecate/hecate)")
 def test_real_hecate_line_count_and_rows(tmp_path):
     rng = random.Random(1)
     fa = tmp_path / "t.fa"
