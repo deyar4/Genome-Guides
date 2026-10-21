@@ -20,6 +20,23 @@ def expected_model_class(first_block_len):
     return "markov"
 
 
+def check_model_class(contigs, pin):
+    """Fail BEFORE the long run when the expected model class differs from the pinned one (audit 03 S3, D40).
+    pin None or "any" disables the check (small test genomes). The expectation is a proxy (first record, capped at one block
+    budget), not a measurement of what hecate chose; test_hecate_model_context.py-style evidence: the same 100 kb gives
+    different probabilities alone and as the head of a 1.5 Mb file (2026-10-21, see LOGBOOK), so classes are not comparable."""
+    if pin in (None, "any"):
+        return
+    first_len = contigs[0][1] if contigs else 0
+    got = expected_model_class(min(first_len, 1 << 20))
+    if got != pin:
+        raise SystemExit(
+            f"Model class mismatch: pinned '{pin}' but the first record ({first_len} bases) is expected to give '{got}'. "
+            f"Probabilities from different classes are not comparable (audit 03 S3). Fix the config pin "
+            f"tracks.hecate_bwt.model_class or the input order."
+        )
+
+
 def stream_pad_indices(contigs):
     """Stream indices of the pad entry hecate logs after each odd-length record.
 
@@ -69,6 +86,7 @@ def process_mprob(
     chunk_windows=1000,
     symbols_per_base=1,
     nonacgt_bed=None,
+    model_class_pin=None,
 ):
     if window_size < 1:
         raise ValueError("window size must be at least 1")
@@ -97,6 +115,7 @@ def process_mprob(
         )
     except (OSError, ValueError, pd.errors.ParserError) as exc:
         raise SystemExit(f"Error: Cannot read Hecate probability stream '{xz_path}': {exc}") from exc
+    check_model_class(contigs, model_class_pin)
 
     masks = load_masks(nonacgt_bed)
     stats = {"bases": 0, "masked": 0, "prob_zero": 0}
@@ -268,8 +287,19 @@ if __name__ == "__main__":
         "--nonacgt-bed",
         help="BED (0-based, half-open) of non-ACGT runs; those bases get NaN and are excluded from window statistics",
     )
+    parser.add_argument(
+        "--model-class-pin",
+        default="any",
+        help="Required expected model class (markov, bmarkov, vmarkov) or 'any' to skip the check (default: any)",
+    )
+    parser.add_argument("--check-only", action="store_true", help="Only run the model-class check on the .fai, then exit")
     add_resource_args(parser)
     args = parser.parse_args()
+    if args.check_only:
+        with open(args.fai) as handle:
+            first = [line.split("\t") for line in handle if line.strip()][:1]
+        check_model_class([(r[0], int(r[1])) for r in first], args.model_class_pin)
+        sys.exit(0)
     chunk_windows = min(args.chunk_windows, max(100, effective_memory_mb(args.memory_mb) // 4))
     process_mprob(
         args.fai,
@@ -279,4 +309,5 @@ if __name__ == "__main__":
         chunk_windows,
         args.symbols_per_base,
         args.nonacgt_bed,
+        args.model_class_pin,
     )

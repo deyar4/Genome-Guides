@@ -69,6 +69,11 @@ tracks:
     # so commit, patch and hash are the identity. The hash is always recorded in data/interim/hecate_binary.txt;
     # a mismatch only warns (another toolchain can differ) unless strict_hash is true (reference machine, Docker).
     strict_hash: false
+    # Required expected model class per genome (D40, audit 03 S3). Hecate's model class follows the first block, and the same
+    # sequence gets different probabilities alone and inside a larger file, so tracks of different classes are not comparable.
+    # Genomes not listed here skip the check (small test genomes).
+    model_class:
+      t2t: "markov"
     repo: "https://gitlab.com/rahmannlab/hecate.git"
     subdir: "."
     commit: "76b48360b52130b9e6149a1c90984d4ed74757f3"

@@ -294,17 +294,22 @@ rule compute_hecate_mprob:
         mem_mb=config["resources"]["hecate"]["mem_mb"]
     params:
         chunk_windows=config["tracks"]["hecate_bwt"]["chunk_windows"],
-        hecate=config["tracks"]["hecate_bwt"]["binary"]
+        hecate=config["tracks"]["hecate_bwt"]["binary"],
+        model_class_pin=lambda wc: config["tracks"]["hecate_bwt"].get("model_class", {}).get(wc.genome, "any")
     shell:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         seqkit locate -P -i -r -p "[^ACGT]+" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n | bedtools merge -i - > {output.nonacgt}
+        # fail before the long run if the first record would give another model class than the pinned one (D40)
+        python3 packages/pipeline/scripts/common/process_hecate_mprob.py --check-only \
+            -f {input.fai} -i {output.mprob} -o {output.parquet} --model-class-pin {params.model_class_pin}
         # hecate uses rayon, which takes all cores unless capped (no thread flag in its CLI).
         export RAYON_NUM_THREADS={threads}
         {params.hecate} --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
             -f {input.fai} -i {output.mprob} \
             -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows} \
-            --nonacgt-bed {output.nonacgt}
+            --nonacgt-bed {output.nonacgt} \
+            --model-class-pin {params.model_class_pin}
         """

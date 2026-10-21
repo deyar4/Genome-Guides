@@ -128,3 +128,19 @@ def test_expected_model_class_matches_upstream_dispatch():
     assert expected_model_class(786_431) == "bmarkov"
     assert expected_model_class(786_432) == "markov"
     assert expected_model_class(1 << 20) == "markov"        # T2T chr1 is capped at one block budget
+
+
+def test_model_class_pin_fails_before_work(tmp_path):
+    from process_hecate_mprob import check_model_class
+    import pytest as _pytest
+    check_model_class([("chrM", 16_569)], "any")
+    check_model_class([("chrM", 16_569)], None)
+    check_model_class([("chr1", 248_000_000)], "markov")
+    with _pytest.raises(SystemExit, match="Model class mismatch"):
+        check_model_class([("chrM", 16_569)], "markov")
+    fai = tmp_path / "t.fai"
+    fai.write_text("chrM\t16569\t6\t80\t81\n")
+    r = __import__("subprocess").run(
+        [sys.executable, str(Path(__file__).resolve().parents[1] / "common/process_hecate_mprob.py"), "--check-only",
+         "-f", str(fai), "-i", "x", "-o", "y", "--model-class-pin", "markov"], capture_output=True, text=True)
+    assert r.returncode != 0 and "Model class mismatch" in r.stderr
