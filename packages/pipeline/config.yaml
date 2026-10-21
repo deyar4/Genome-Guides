@@ -31,6 +31,10 @@ tracks:
     enabled: true
     window_size: 1000
     step_size: 1000
+  shannon_entropy:
+    window_size: 1000
+    # Window entropy is NA when fewer than this fraction of window_size bases are A/C/G/T (audit S8).
+    min_acgt_fraction: 0.5
   hecate_bwt:
     enabled: false
     # Match the probability track's local entropy resolution without large batches.

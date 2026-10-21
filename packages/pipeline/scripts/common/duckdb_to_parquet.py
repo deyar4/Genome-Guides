@@ -45,8 +45,9 @@ QUERIES = {
                 column1::UBIGINT AS start_pos, 
                 column2::UBIGINT AS end_pos, 
                 column3::FLOAT AS shannon_entropy, 
-                column4::UBIGINT AS telomeric_repeats 
-            FROM read_csv('{input_tsv}', sep='\t', header=false)
+                column4::UBIGINT AS telomeric_repeats,
+                column5::UBIGINT AS n_acgt
+            FROM read_csv('{input_tsv}', sep='\t', header=false, nullstr='NA')
         ) TO '{output_parquet}' (FORMAT 'PARQUET', COMPRESSION 'ZSTD')
     """,
     "dinucleotides": """

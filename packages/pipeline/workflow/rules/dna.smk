@@ -133,11 +133,14 @@ rule compute_shannon_entropy:
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
+    params:
+        window=config["tracks"]["shannon_entropy"]["window_size"],
+        min_acgt=int(config["tracks"]["shannon_entropy"]["min_acgt_fraction"] * config["tracks"]["shannon_entropy"]["window_size"])
     shell:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        bedtools makewindows -g {input.fai} -w 1000 -s 1000 | sort -k1,1 -k2,2n > {output.windows}
+        bedtools makewindows -g {input.fai} -w {params.window} -s {params.window} | sort -k1,1 -k2,2n > {output.windows}
         bedtools nuc -fi {input.fasta} -bed {output.windows} | grep -v "^#" > {output.nuc}
         seqkit locate -P -i -r -p "TTAGGG|CCCTAA" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
         if [ ! -s {output.locs} ]; then
@@ -145,17 +148,18 @@ rule compute_shannon_entropy:
         else
             bedtools map -a {output.nuc} -b {output.locs} -c 4 -o count -null 0
         fi > {output.mapped}
-        awk 'BEGIN {{OFS="\\t"; log2=log(2)}} {{
+        awk -v min_acgt={params.min_acgt} 'BEGIN {{OFS="\\t"; log2=log(2)}} {{
             na=$6; nc=$7; ng=$8; nt=$9;
             tot = na + nc + ng + nt;
-            entropy = 0;
-            if (tot > 0) {{
+            entropy = "NA";
+            if (tot >= min_acgt && tot > 0) {{
+                entropy = 0;
                 pa = na / tot; if (pa > 0) entropy -= pa * log(pa)/log2;
                 pc = nc / tot; if (pc > 0) entropy -= pc * log(pc)/log2;
                 pg = ng / tot; if (pg > 0) entropy -= pg * log(pg)/log2;
                 pt = nt / tot; if (pt > 0) entropy -= pt * log(pt)/log2;
             }}
-            print $1, $2, $3, entropy, $13
+            print $1, $2, $3, entropy, $13, tot
         }}' {output.mapped} > {output.tsv}
         python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t shannon_entropy
         """
@@ -227,7 +231,8 @@ rule compute_hecate_mprob:
     output:
         parquet="data/tracks/{genome}/all/hecate_mprob.parquet",
         he=temp("data/interim/{genome}/temp.he"),
-        mprob=temp("data/interim/{genome}/mprob.xz")
+        mprob=temp("data/interim/{genome}/mprob.xz"),
+        nonacgt=temp("data/interim/{genome}/nonacgt.bed")
     log:
         "logs/{genome}/compute_hecate_mprob.log"
     threads: config["resources"]["hecate"]["threads"]
@@ -239,8 +244,10 @@ rule compute_hecate_mprob:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
+        seqkit locate -P -i -r -p "[^ACGT]+" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n | bedtools merge -i - > {output.nonacgt}
         packages/hecate/target/release/hecate --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
             -f {input.fai} -i {output.mprob} \
-            -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows}
+            -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows} \
+            --nonacgt-bed {output.nonacgt}
         """

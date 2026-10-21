@@ -5,6 +5,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import sys
+import warnings
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from resource_args import add_resource_args, effective_memory_mb
 
@@ -19,6 +20,36 @@ def stream_pad_indices(contigs):
     return ends[odd] - 1
 
 
+def load_masks(bed_path):
+    """Read 0-based half-open BED intervals of non-ACGT bases into {contig: (starts, ends)}."""
+    raw = {}
+    if bed_path:
+        with open(bed_path) as f:
+            for line in f:
+                parts = line.split('\t')
+                if len(parts) >= 3:
+                    raw.setdefault(parts[0], []).append((int(parts[1]), int(parts[2])))
+    return {
+        c: (np.array([a for a, _ in sorted(v)]), np.array([b for _, b in sorted(v)]))
+        for c, v in raw.items()
+    }
+
+
+def mask_nonacgt(values, masks, contig, offset):
+    """Return a copy of values (contig positions offset..offset+len) with non-ACGT bases set to NaN."""
+    if contig not in masks:
+        return values
+    starts, ends = masks[contig]
+    lo, hi = offset, offset + len(values)
+    out = values.copy()
+    first = np.searchsorted(ends, lo, side='right')
+    for a, b in zip(starts[first:], ends[first:]):
+        if a >= hi:
+            break
+        out[max(a, lo) - lo:min(b, hi) - lo] = np.nan
+    return out
+
+
 def process_mprob(
     fai_path,
     xz_path,
@@ -26,6 +57,7 @@ def process_mprob(
     window_size=1000,
     chunk_windows=1000,
     symbols_per_base=1,
+    nonacgt_bed=None,
 ):
     if window_size < 1:
         raise ValueError("window size must be at least 1")
@@ -55,6 +87,7 @@ def process_mprob(
     except (OSError, ValueError, pd.errors.ParserError) as exc:
         raise SystemExit(f"Error: Cannot read Hecate probability stream '{xz_path}': {exc}") from exc
 
+    masks = load_masks(nonacgt_bed)
     pad_idx = stream_pad_indices(contigs)
     stream_pos = 0
     contig_idx = 0
@@ -71,6 +104,7 @@ def process_mprob(
         ("min_prob", pa.float32()),
         ("max_prob", pa.float32()),
         ("mean_entropy", pa.float32()),
+        ("n_valid", pa.uint32()),
     ])
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     writer = pq.ParquetWriter(out_path, arrow_schema, compression="zstd")
@@ -103,7 +137,8 @@ def process_mprob(
             chunk_len = len(probs)
             records = {
                 "contig": [], "start_pos": [], "end_pos": [],
-                "mean_prob": [], "min_prob": [], "max_prob": [], "mean_entropy": []
+                "mean_prob": [], "min_prob": [], "max_prob": [], "mean_entropy": [],
+                "n_valid": []
             }
 
             while chunk_pos < chunk_len:
@@ -114,8 +149,10 @@ def process_mprob(
                 remaining_in_contig = current_contig_len - pos_in_contig
                 take = min(chunk_len - chunk_pos, remaining_in_contig)
 
-                p_slice = np.concatenate((pending_p, probs[chunk_pos:chunk_pos + take]))
-                e_slice = np.concatenate((pending_e, entropies[chunk_pos:chunk_pos + take]))
+                p_part = mask_nonacgt(probs[chunk_pos:chunk_pos + take], masks, current_contig, pos_in_contig)
+                e_part = mask_nonacgt(entropies[chunk_pos:chunk_pos + take], masks, current_contig, pos_in_contig)
+                p_slice = np.concatenate((pending_p, p_part))
+                e_slice = np.concatenate((pending_e, e_part))
                 window_start = pos_in_contig - len(pending_p)
                 reaches_contig_end = pos_in_contig + take >= current_contig_len
                 window_count = len(p_slice) // window_size
@@ -129,10 +166,14 @@ def process_mprob(
 
                 p_2d = p_slice[:used].reshape(-1, window_size)
                 e_2d = e_slice[:used].reshape(-1, window_size)
-                mean_p = np.nanmean(p_2d, axis=1)
-                min_p = np.nanmin(p_2d, axis=1)
-                max_p = np.nanmax(p_2d, axis=1)
-                mean_e = np.nanmean(e_2d, axis=1)
+                with warnings.catch_warnings():
+                    # Windows with no valid base are NaN by design (counted in n_valid = 0).
+                    warnings.simplefilter("ignore", RuntimeWarning)
+                    mean_p = np.nanmean(p_2d, axis=1)
+                    min_p = np.nanmin(p_2d, axis=1)
+                    max_p = np.nanmax(p_2d, axis=1)
+                    mean_e = np.nanmean(e_2d, axis=1)
+                n_valid = (~np.isnan(p_2d)).sum(axis=1)
 
                 num_windows = len(mean_p)
                 starts = window_start + np.arange(num_windows) * window_size
@@ -147,6 +188,7 @@ def process_mprob(
                 records["min_prob"].extend(min_p)
                 records["max_prob"].extend(max_p)
                 records["mean_entropy"].extend(mean_e)
+                records["n_valid"].extend(n_valid)
 
                 chunk_pos += take
                 pos_in_contig += take
@@ -160,7 +202,12 @@ def process_mprob(
                     pending_e = e_slice[used:]
 
             if records["contig"]:
-                writer.write_table(pa.table(records, schema=arrow_schema))
+                # NaN -> NULL so that DuckDB aggregates in the API skip missing windows instead of returning NaN.
+                columns = [
+                    pa.array(records[f.name], type=f.type, from_pandas=True)
+                    for f in arrow_schema
+                ]
+                writer.write_table(pa.table(columns, schema=arrow_schema))
     finally:
         writer.close()
     if contig_idx != len(contigs) or pos_in_contig:
@@ -186,6 +233,10 @@ if __name__ == "__main__":
         default=1000,
         help="Maximum windows buffered per input batch (default: 1000)",
     )
+    parser.add_argument(
+        "--nonacgt-bed",
+        help="BED (0-based, half-open) of non-ACGT runs; those bases get NaN and are excluded from window statistics",
+    )
     add_resource_args(parser)
     args = parser.parse_args()
     chunk_windows = min(args.chunk_windows, max(100, effective_memory_mb(args.memory_mb) // 4))
@@ -196,4 +247,5 @@ if __name__ == "__main__":
         args.window,
         chunk_windows,
         args.symbols_per_base,
+        args.nonacgt_bed,
     )
