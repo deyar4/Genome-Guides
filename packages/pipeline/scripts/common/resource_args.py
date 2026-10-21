@@ -22,7 +22,9 @@ def add_resource_args(parser: argparse.ArgumentParser) -> None:
             raise positive("must be at least 1")
         return parsed
 
-    parser.add_argument("--threads", type=positive_int, default=1, help="Worker threads")
+    parser.add_argument(
+        "--threads", type=positive_int, default=1, help="Worker threads"
+    )
     parser.add_argument(
         "--memory-mb",
         type=positive_int,

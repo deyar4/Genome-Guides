@@ -124,7 +124,13 @@ def write_batched_seqkit_gc(input_tsv, output_parquet, schema):
         header = handle.readline().rstrip("\n").split("\t")
     if len(header) < 3:
         raise ValueError("seqkit GC input must contain a name and two metric columns")
-    columns = [name.lower().replace("#", "").strip() for name in header]
+    columns = []
+    seen = {}
+    for name in header:
+        normalized = name.lower().replace("#", "").strip()
+        occurrence = seen.get(normalized, 0)
+        seen[normalized] = occurrence + 1
+        columns.append(normalized if occurrence == 0 else f"{normalized}_{occurrence}")
     batches = pl.scan_csv(
         input_tsv,
         separator="\t",
