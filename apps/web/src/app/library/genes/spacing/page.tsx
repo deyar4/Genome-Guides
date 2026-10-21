@@ -140,9 +140,9 @@ export default function GeneSpacingPage() {
                          <TableCell>
                            <Badge variant="secondary" className={cn(
                              "text-[10px] uppercase font-bold border-none",
-                             o.overlap_type === 'sense' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                             o.overlap_type === 'same_strand' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                            )}>
-                              {o.overlap_type}
+                              {o.overlap_type === 'same_strand' ? 'same strand' : 'opposite strand'}{o.contained ? ' · contained' : ''}
                            </Badge>
                          </TableCell>
                          <TableCell className="font-mono text-xs text-slate-500">{o.chrom}</TableCell>

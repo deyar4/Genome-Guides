@@ -343,22 +343,27 @@ def get_ssr(
     path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
         return []
-    filters = [f"chrom = '{chrom}'"]
+    filters, params = ["chrom = ?"], [chrom]
     if start is not None:
-        filters.append(f'"end" > {start}')
+        filters.append('"end" > ?')
+        params.append(start)
     if end is not None:
-        filters.append(f'"start" < {end}')
+        filters.append('"start" < ?')
+        params.append(end)
     if min_repeats is not None:
-        filters.append(f"repeat_count >= {min_repeats}")
+        filters.append("repeat_count >= ?")
+        params.append(min_repeats)
     if period is not None:
-        filters.append(f"period = {period}")
+        filters.append("period = ?")
+        params.append(period)
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", motif, period, repeat_count, sequence,
                    length, period_name, complexity
             FROM read_parquet('{path}')
             WHERE {' AND '.join(filters)}
             ORDER BY "start", "end"
-            LIMIT {limit} OFFSET {offset}"""
+            LIMIT ? OFFSET ?""",
+        params + [limit, offset],
     )
 
 @router.get("/ssr/summary", response_model=List[SSRSummary])
@@ -385,8 +390,9 @@ def get_ssr_density(
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", count
             FROM read_parquet('{path}')
-            WHERE chrom = '{chrom}'
-            ORDER BY "start" """
+            WHERE chrom = ?
+            ORDER BY "start" """,
+        [chrom],
     )
 
 

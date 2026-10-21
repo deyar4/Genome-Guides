@@ -212,7 +212,9 @@ export interface GeneOverlap {
   chrom: string;
   gene_id_1: string;
   gene_id_2: string;
-  overlap_type: string;
+  overlap_type: 'same_strand' | 'opposite_strand';
+  overlap_len: number;
+  contained: boolean;
 }
 
 export interface NestedGenePair {
