@@ -161,7 +161,11 @@ class DuckDBTrackService:
                 for col in numeric_cols:
                     clean = self._clean(col, types[col])
                     if track_name == "gc_content" and col == "gc_pct":
-                        select_cols += [f"{GC_PCT_SQL} AS avg_value", f"MIN({clean}) AS min_value", f"MAX({clean}) AS max_value"]
+                        # Counts give the exact value. Fixtures without base counts (all zero) fall back to the window-length-weighted
+                        # mean of gc_pct; N-only windows (gc_pct NaN -> NULL) stay NULL.
+                        fallback = (f"SUM({clean} * CAST(end_pos - start_pos AS DOUBLE)) / "
+                                    f"NULLIF(SUM(CASE WHEN {clean} IS NOT NULL THEN CAST(end_pos - start_pos AS DOUBLE) END), 0)")
+                        select_cols += [f"COALESCE({GC_PCT_SQL}, {fallback}) AS avg_value", f"MIN({clean}) AS min_value", f"MAX({clean}) AS max_value"]
                     elif track_name == "gc_content" and col == "gc_skew":
                         select_cols += [f"{GC_SKEW_SQL} AS avg_skew", f"COUNT(*) - COUNT({clean}) AS n_null_skew"]
                     elif track_name == "gc_content":
