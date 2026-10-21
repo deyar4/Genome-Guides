@@ -33,6 +33,7 @@ htmlcov/
 
 # Local analysis and generated reports
 artifacts/
+benchmarks/
 analysis/results/
 
 # Operating System

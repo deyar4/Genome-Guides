@@ -11,6 +11,8 @@ rule parse_protein_census:
         richness="data/tracks/{genome}/all/protein_richness.parquet"
     log:
         "logs/{genome}/parse_protein_census.log"
+    benchmark:
+        "benchmarks/{genome}/parse_protein_census.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -29,6 +31,8 @@ rule compute_protein_terminal_bias:
         term_bias="data/tracks/{genome}/all/protein_terminal_bias.parquet"
     log:
         "logs/{genome}/compute_protein_terminal_bias.log"
+    benchmark:
+        "benchmarks/{genome}/compute_protein_terminal_bias.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]

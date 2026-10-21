@@ -14,6 +14,8 @@ rule parse_gene_annotations:
         architecture="data/tracks/{genome}/all/gene_architecture.parquet"
     log:
         "logs/{genome}/parse_gene_annotations.log"
+    benchmark:
+        "benchmarks/{genome}/parse_gene_annotations.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -33,6 +35,8 @@ rule compute_gene_spacing:
         gene_overlaps="data/tracks/{genome}/all/gene_overlaps.parquet"
     log:
         "logs/{genome}/compute_gene_spacing.log"
+    benchmark:
+        "benchmarks/{genome}/compute_gene_spacing.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -58,6 +62,8 @@ rule parse_splice_and_ncrna:
         rna_cluster_summary="data/tracks/{genome}/all/rna_cluster_summary.parquet"
     log:
         "logs/{genome}/parse_splice_and_ncrna.log"
+    benchmark:
+        "benchmarks/{genome}/parse_splice_and_ncrna.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -79,6 +85,8 @@ rule convert_t2t_centromeres:
         source_url="https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_GenomeFeature_v1.0.bed"
     log:
         "logs/t2t/convert_t2t_centromeres.log"
+    benchmark:
+        "benchmarks/convert_t2t_centromeres.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["lightweight"]["mem_mb"]
@@ -98,6 +106,8 @@ rule convert_t2t_telomeres:
         source_url="https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/annotation/chm13v2.0_telomere.bed"
     log:
         "logs/t2t/convert_t2t_telomeres.log"
+    benchmark:
+        "benchmarks/convert_t2t_telomeres.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["lightweight"]["mem_mb"]
@@ -116,6 +126,8 @@ rule compute_repeatmasker_te:
         te_density="data/tracks/{genome}/all/repeatmasker_density.parquet"
     log:
         "logs/{genome}/compute_repeatmasker_te.log"
+    benchmark:
+        "benchmarks/{genome}/compute_repeatmasker_te.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]

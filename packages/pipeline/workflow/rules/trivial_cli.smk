@@ -7,6 +7,8 @@ rule samtools_faidx:
         fai="data/raw/{genome}.fa.fai"
     log:
         "logs/{genome}/samtools_faidx.log"
+    benchmark:
+        "benchmarks/{genome}/samtools_faidx.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["lightweight"]["mem_mb"]
@@ -27,6 +29,8 @@ rule compute_gc_and_skew:
         step=1000
     log:
         "logs/{genome}/compute_gc_and_skew.log"
+    benchmark:
+        "benchmarks/{genome}/compute_gc_and_skew.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -45,6 +49,8 @@ rule extract_assembly_gaps:
         bed=temp("data/interim/{genome}/assembly_gaps.bed")
     log:
         "logs/{genome}/extract_assembly_gaps.log"
+    benchmark:
+        "benchmarks/{genome}/extract_assembly_gaps.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["lightweight"]["mem_mb"]
@@ -61,6 +67,8 @@ rule convert_gc_skew_to_parquet:
         parquet="data/tracks/{genome}/all/gc_content.parquet"
     log:
         "logs/{genome}/convert_gc_skew_to_parquet.log"
+    benchmark:
+        "benchmarks/{genome}/convert_gc_skew_to_parquet.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -80,6 +88,8 @@ rule convert_gaps_to_parquet:
         parquet="data/tracks/{genome}/all/assembly_gaps.parquet"
     log:
         "logs/{genome}/convert_gaps_to_parquet.log"
+    benchmark:
+        "benchmarks/{genome}/convert_gaps_to_parquet.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -99,6 +109,8 @@ rule seqkit_stats:
         stats="data/tracks/{genome}/all/sequence_stats.txt"
     log:
         "logs/{genome}/seqkit_stats.log"
+    benchmark:
+        "benchmarks/{genome}/seqkit_stats.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["lightweight"]["mem_mb"]
