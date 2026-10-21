@@ -72,7 +72,7 @@ export default function RnaRelationshipsPage() {
               ) : relationships?.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-slate-500">
-                    No nesting relationships identified.
+                    Nested-gene detection is not available yet: the API endpoint is a placeholder that always returns an empty list (this is not a measured result of zero nested genes).
                   </TableCell>
                 </TableRow>
               ) : (

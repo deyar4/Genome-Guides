@@ -44,27 +44,27 @@ export default function RnaOverview() {
         {/* METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <GenomicMetricCard 
-            label="Total ncRNAs"
+            label="Non-coding RNA records"
             value={stats?.total_nc_rna ? formatNumber(stats.total_nc_rna) : '...'}
-            description="Total non-coding RNA features identified, including lncRNA, miRNA, snRNA, and snoRNA. These transcripts do not code for proteins but play critical regulatory and structural roles."
+            description="Records in the ncRNA census (unit not documented by the API; larger than the 37,360 non-coding genes of the Biotype Census, so probably transcripts)."
             color="#ec4899"
           />
           <GenomicMetricCard 
-            label="ncRNA Clusters"
+            label="Gene Clusters"
             value={stats?.total_clusters ? formatNumber(stats.total_clusters) : '...'}
-            description="Genomic regions containing multiple structural RNA genes in close proximity, such as the large rRNA arrays and tRNA hubs essential for protein synthesis."
+            description="Clusters of nearby genes, summed over all cluster types listed under Structural Hubs (including protein_coding)."
             color="#8b5cf6"
           />
           <GenomicMetricCard 
             label="RNA Types"
             value={pieData.length || '...'}
-            description="Number of distinct non-coding biotypes detected. Each type (e.g., miRNA, snRNA) has a specific molecular function, from gene silencing to splicing catalysis."
+            description="Number of distinct non-coding subclasses in the census (see the distribution below)."
             color="#3b82f6"
           />
           <GenomicMetricCard 
             label="Largest Cluster"
-            value={summary?.cluster_summaries?.[0]?.max_cluster_size || '...'}
-            description="The maximum number of RNA genes found within a single genomic cluster, typically representing a major site of structural RNA production."
+            value={summary?.cluster_summaries?.length ? Math.max(...summary.cluster_summaries.map(c => c.max_cluster_size)) : '...'}
+            description="Largest number of genes in a single cluster, over all cluster types."
             color="#10b981"
           />
         </div>

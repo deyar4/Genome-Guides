@@ -84,7 +84,7 @@ export default function RnaClustersPage() {
           
           <div className="ml-auto">
              <Badge variant="outline" className="px-3 py-1 text-xs font-mono">
-                {clusters?.length || 0} Clusters Found
+                {clusters && clusters.length >= 5000 ? 'First 5,000 clusters (API cap; narrow with the filters)' : `${clusters?.length || 0} Clusters Found`}
              </Badge>
           </div>
         </div>

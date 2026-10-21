@@ -59,7 +59,7 @@ export default function SpliceSitesPage() {
                    : "bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-400 hover:border-primary/30"
                )}
              >
-               {type} Site (5&apos;)
+               {type} Site ({type === 'donor' ? "5'" : "3'"})
              </button>
            ))}
         </div>
@@ -78,7 +78,7 @@ export default function SpliceSitesPage() {
                    </span>
                  ))}
               </div>
-              <p className="text-xs text-slate-400 mt-4">Based on {consensus ? (consensus.total_sites / 1000).toFixed(0) : '...'}k validated junctions</p>
+              <p className="text-xs text-slate-400 mt-4">Based on {consensus ? consensus.total_sites.toLocaleString() : '...'} annotated junction records</p>
            </Card>
 
            <div className="lg:col-span-2 p-8 bg-slate-900 rounded-3xl border border-slate-800 flex gap-6 items-start">
@@ -89,18 +89,8 @@ export default function SpliceSitesPage() {
                  <h4 className="font-bold text-foreground uppercase text-xs tracking-widest">Molecular Logic</h4>
                  <p className="text-sm text-slate-400 leading-relaxed">
                    The {siteType} site is the highly conserved boundary where the spliceosome initiates the excision of an intron. 
-                   The sequence logo below represents the probability of each nucleotide appearing at specific positions relative to the cleavage point.
+                   The chart below shows the probability of each nucleotide at each position of the site dinucleotide, as served by the API (no information-content or log-odds transform).
                  </p>
-                 <div className="flex items-center gap-4 pt-2">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                       <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                       Exonic
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                       <div className="h-2 w-2 rounded-full bg-blue-500" />
-                       Intronic
-                    </div>
-                 </div>
               </div>
            </div>
         </div>
@@ -110,7 +100,7 @@ export default function SpliceSitesPage() {
            <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
                  <Activity className="h-5 w-5 text-primary" />
-                 Position Weight Matrix (Log-Odds)
+                 Nucleotide Probability per Position
               </h3>
            </div>
 
@@ -134,7 +124,7 @@ export default function SpliceSitesPage() {
                    tickSize: 5,
                    tickPadding: 10,
                    tickRotation: 0,
-                   legend: 'Relative Position (bp)',
+                   legend: 'Position in site dinucleotide',
                    legendPosition: 'middle',
                    legendOffset: 50
                  }}
@@ -142,11 +132,12 @@ export default function SpliceSitesPage() {
                    tickSize: 5,
                    tickPadding: 10,
                    tickRotation: 0,
-                   legend: 'Information Content (Bits)',
+                   legend: 'Probability',
                    legendPosition: 'middle',
                    legendOffset: -50,
-                   format: '.1f'
+                   format: '.2f'
                  }}
+                 label={d => Number(d.value).toFixed(3)}
                  labelSkipWidth={12}
                  labelSkipHeight={12}
                  theme={chartTheme}
@@ -190,8 +181,8 @@ export default function SpliceSitesPage() {
         <Card className="p-6 sm:p-8 bg-white dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 shadow-sm">
           <div className="flex items-center justify-between gap-4 mb-6">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Validated junction records</h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">A live sample from the backend splice-site track.</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-zinc-100">Junction records (first 12)</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">First records returned by the API for this site type; several transcripts can share one junction.</p>
             </div>
             <span className="text-xs font-mono text-muted-foreground">{recordsLoading ? 'Loading…' : `${spliceRecords.length} records`}</span>
           </div>
@@ -202,6 +193,7 @@ export default function SpliceSitesPage() {
                   <th className="px-3 py-3">Chromosome</th>
                   <th className="px-3 py-3">Coordinates</th>
                   <th className="px-3 py-3">Gene</th>
+                  <th className="px-3 py-3">Transcript</th>
                   <th className="px-3 py-3">Strand</th>
                   <th className="px-3 py-3">Canonical</th>
                 </tr>
@@ -212,6 +204,7 @@ export default function SpliceSitesPage() {
                     <td className="px-3 py-3 font-mono font-semibold">{record.chrom}</td>
                     <td className="px-3 py-3 font-mono text-muted-foreground">{record.start.toLocaleString()}–{record.end.toLocaleString()}</td>
                     <td className="px-3 py-3">{record.gene_id}</td>
+                    <td className="px-3 py-3 font-mono text-muted-foreground">{record.transcript_id}</td>
                     <td className="px-3 py-3">{record.strand}</td>
                     <td className="px-3 py-3">{record.is_canonical ? 'Yes' : 'No'}</td>
                   </tr>
