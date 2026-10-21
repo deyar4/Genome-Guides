@@ -9,6 +9,16 @@ import warnings
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from resource_args import add_resource_args, effective_memory_mb
 
+def expected_model_class(first_block_bytes):
+    """Model machine hecate picks for a stream, from its first block size (markov_codec.rs `dispatch`, upstream 76b4836:
+    < 200,000 -> vmarkov; < 3/4 * 1 MiB block budget -> bmarkov; else markov). Block size is in nucleotides."""
+    if first_block_bytes < 200_000:
+        return "vmarkov"
+    if first_block_bytes < (1 << 20) * 3 // 4:
+        return "bmarkov"
+    return "markov"
+
+
 def stream_pad_indices(contigs):
     """Stream indices of the pad entry hecate logs after each odd-length record.
 
@@ -218,6 +228,14 @@ def process_mprob(
         raise ValueError(
             f"Probability stream ended early: {contig_idx} of {len(contigs)} contigs complete"
         )
+    # The model class changes what the numbers mean (audit 03 S3), so every run records which one to expect. The first block
+    # is at most one block budget (1 MiB) of the first record; whether the muxer cuts exactly there is NOT verified.
+    first_len = contigs[0][1] if contigs else 0
+    print(
+        f"model class expected from the first record ({first_len} bases): {expected_model_class(min(first_len, 1 << 20))} "
+        f"(T2T must say markov; vmarkov/bmarkov streams are not comparable to the full run)",
+        file=sys.stderr,
+    )
     valid = stats["bases"] - stats["masked"]
     print(
         f"hecate probabilities: bases={stats['bases']} masked_nonacgt={stats['masked']} valid={valid} "

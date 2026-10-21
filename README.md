@@ -21,8 +21,8 @@ Generated genome data belongs under `data/` and is ignored by Git.
 
 - Linux or macOS
 - Conda or micromamba
-- Node.js and pnpm for the web application
-- Git
+- Git, network access for the first run (reference downloads and the hecate build)
+- A C compiler with OpenMP (system `gcc`); Rust, Node.js and pnpm come from the conda environment
 
 The supported Python environment is defined in `environment.yml`.
 
@@ -34,23 +34,24 @@ mamba env create -f environment.yml
 mamba env update -f environment.yml --prune
 ```
 
-The environment includes Python, Snakemake, `uv`, Seqkit, Samtools, Bedtools,
-Polars, PyArrow, DuckDB, and the backend dependencies.
+All versions are pinned in `environment.yml` (exact solve: `environment.lock.yml`). Backend Python
+packages are managed by `uv` in `apps/backend` only.
 
 ## Running the pipeline
 
 The workflow is under `packages/pipeline/workflow/Snakefile`.
 
-Run the small configured target:
+Quickstart (`CORES` and `MEM_MB` are Make variables, see the Makefile):
 
 ```bash
-mamba run -n genome-guides snakemake \
-  -s packages/pipeline/workflow/Snakefile \
-  --cores 4 \
-  --resources mem_mb=8192
+make env-create       # once
+make check            # unit tests (+ tiling check when t2t tracks exist)
+make pipeline-chrm    # small development run (hg38 chrM, smoke test only)
+make pipeline-t2t     # full T2T-CHM13v2.0 run; long, hecate peaks near 7.4 GB RAM
 ```
 
-Run the configured chromosome or telomere-to-telomere targets:
+Reference downloads are verified against the sha256 values in `packages/pipeline/config.yaml`
+(`reference:`); a mismatch stops the run and keeps no output file. Equivalent direct calls:
 
 ```bash
 mamba run -n genome-guides snakemake \
@@ -113,19 +114,13 @@ application's environment and API client files.
 
 ## Validation
 
-Run the pipeline smoke test:
+Run everything that needs no long run:
 
 ```bash
-mamba run -n genome-guides python packages/pipeline/scripts/tests/test_pipeline.py
+make check
 ```
 
-Run compliance regression tests:
-
-```bash
-mamba run -n genome-guides python packages/pipeline/scripts/tests/test_compliance.py
-```
-
-Run backend tests:
+Run only the backend tests:
 
 ```bash
 cd apps/backend

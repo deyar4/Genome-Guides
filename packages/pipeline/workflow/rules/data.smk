@@ -57,6 +57,8 @@ rule download_t2t_gff:
         python3 packages/pipeline/scripts/common/fetch_verified.py --url {params.url} --sha256 {params.sha256} --output {output}
         """
 
+# NOTE: despite the name this is the T2T GenomeFeature annotation (SD, SAT, CEN, TEL, rDNA), not only centromeres (audit 04, M5).
+# The file name is kept so existing outputs stay valid.
 rule download_t2t_centromeres:
     output:
         bed="data/raw/t2t_centromeres.bed"

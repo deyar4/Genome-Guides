@@ -118,3 +118,13 @@ def test_real_hecate_line_count_and_rows(tmp_path):
     df = pl.read_parquet(out)
     assert df.height == sum(-(-n // 100) for _, n in CONTIGS)
     assert df.group_by("contig").agg(pl.col("end_pos").max()).sort("contig")["end_pos"].to_list() == [n for _, n in CONTIGS]
+
+
+def test_expected_model_class_matches_upstream_dispatch():
+    from process_hecate_mprob import expected_model_class
+    assert expected_model_class(16_569) == "vmarkov"       # chrM
+    assert expected_model_class(199_999) == "vmarkov"
+    assert expected_model_class(200_000) == "bmarkov"
+    assert expected_model_class(786_431) == "bmarkov"
+    assert expected_model_class(786_432) == "markov"
+    assert expected_model_class(1 << 20) == "markov"        # T2T chr1 is capped at one block budget
