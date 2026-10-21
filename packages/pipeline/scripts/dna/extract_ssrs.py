@@ -46,6 +46,28 @@ def scan(chrom, sequence):
     return selected
 
 
+MAX_PERIOD = max(PERIOD_NAMES)
+# Longest stretch at the end of a chunk in which a not-yet-visible repeat could still start (smallest tract that matches)
+TAIL_MARGIN = max(period * minimum for period, minimum in MIN_REPEATS.items())
+
+
+def safe_cut(hits, size):
+    """Position up to which hits are final. A hit may still grow if it touches the chunk end, a new tract may start in
+    the last TAIL_MARGIN bases, and no emitted hit may straddle the cut (the next chunk restarts the scan there)."""
+    cut = size - TAIL_MARGIN
+    for hit in hits:
+        if hit["end"] > size - MAX_PERIOD:
+            cut = min(cut, hit["start"])
+    changed = True
+    while changed:
+        changed = False
+        for hit in hits:
+            if hit["start"] < cut < hit["end"]:
+                cut = hit["start"]
+                changed = True
+    return max(cut, 0)
+
+
 def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
     if window_size < 1 or chunk_bases < 1:
         raise ValueError("window size and chunk size must be positive")
@@ -56,9 +78,8 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
     density_counts = Counter()
     total_ssr_bases = 0
     open_fn = gzip.open if str(fasta).endswith(".gz") else open
-    chrom, block, carry = None, [], ""
-    offset, length, block_length = 0, 0, 0
-    seen = set()
+    chrom, block = None, []
+    carry, carry_start, length, block_length = "", 0, 0, 0
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     hit_schema = {
@@ -70,53 +91,52 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
         pa.field(name, dtype) for name, dtype in hit_schema.items()
     ]), compression="zstd")
 
-    def flush():
-        nonlocal block, carry, block_length, total_ssr_bases
-        if chrom is None or not block:
+    def flush(final):
+        """Scan carry + new block; emit only hits that cannot change with more sequence (chunk-size independent)."""
+        nonlocal block, carry, carry_start, block_length, total_ssr_bases
+        if chrom is None:
             return
-        sequence = "".join(block)
-        combined = carry + sequence
-        combined_offset = offset - len(carry)
+        combined = carry + "".join(block)
+        block, block_length = [], 0
+        hits = scan(chrom, combined)
+        cut = len(combined) if final else safe_cut(hits, len(combined))
         batch = []
-        for hit in scan(chrom, combined):
-            hit["start"] += combined_offset
-            hit["end"] += combined_offset
-            key = (hit["start"], hit["end"], hit["motif"])
-            if key not in seen and hit["start"] >= 0:
-                seen.add(key)
-                batch.append(hit)
-                period_counts[hit["period"]] += 1
-                period_bases[hit["period"]] += hit["length"]
-                density_counts[(chrom, (hit["start"] // window_size) * window_size)] += 1
-                total_ssr_bases += hit["length"]
+        for hit in hits:
+            if hit["end"] > cut:
+                continue
+            hit["start"] += carry_start
+            hit["end"] += carry_start
+            batch.append(hit)
+            period_counts[hit["period"]] += 1
+            period_bases[hit["period"]] += hit["length"]
+            density_counts[(chrom, (hit["start"] // window_size) * window_size)] += 1
+            total_ssr_bases += hit["length"]
         if batch:
             hit_writer.write_table(pa.table({
                 key: pa.array([row[key] for row in batch], type=value)
                 for key, value in hit_schema.items()
             }))
-        carry = combined[-1024:]
-        block = []
-        block_length = 0
+        carry_start += cut
+        carry = combined[cut:]
 
     with open_fn(fasta, "rt") as handle:
         for line in handle:
             if line.startswith(">"):
                 if chrom is not None:
-                    flush()
+                    flush(final=True)
                     chrom_lengths[chrom] = length
                 chrom = line[1:].split()[0]
-                block, carry, offset, length, block_length = [], "", 0, 0, 0
-                seen = set()
+                block, carry, carry_start, length, block_length = [], "", 0, 0, 0
             else:
-                sequence = line.strip()
+                # Soft-masked (lowercase) bases are sequence too: T2T is 61.7 % lowercase, and the repeats are mostly there.
+                sequence = line.strip().upper()
                 block.append(sequence)
                 length += len(sequence)
                 block_length += len(sequence)
                 if block_length >= chunk_bases:
-                    flush()
-                    offset = length
+                    flush(final=False)
         if chrom is not None:
-            flush()
+            flush(final=True)
             chrom_lengths[chrom] = length
     hit_writer.close()
 
