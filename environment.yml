@@ -12,6 +12,9 @@ dependencies:
   - samtools>=1.19
   - bedtools>=2.31
   - datamash>=1.8
+  # hecate is built from a pinned upstream commit (D32). Rust is pinned so builds from this env are comparable;
+  # the C compiler with OpenMP (libgomp) is taken from the system (upstream INSTALL), not from conda.
+  - rust=1.99.0
   # Data & Backend core
   - pyarrow>=14.0
   - duckdb>=0.9

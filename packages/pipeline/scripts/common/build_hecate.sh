@@ -16,3 +16,9 @@ cargo_home="${CARGO_HOME:-$HOME/.cargo}"
     cargo build --release --locked)
 mkdir -p "$(dirname "$out")"
 cp "$work/src/target/release/hecate" "$out"
+# Build provenance next to the binary (read by check_hecate.py).
+{
+    echo "commit	$commit"
+    echo "rustc	$(rustc --version)"
+    echo "cc	$(${CC:-cc} --version | head -n 1)"
+} > "$out.build-info"

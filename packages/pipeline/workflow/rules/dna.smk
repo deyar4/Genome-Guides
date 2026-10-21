@@ -248,11 +248,12 @@ rule check_hecate:
         info="data/interim/hecate_binary.txt"
     params:
         commit=config["tracks"]["hecate_bwt"]["commit"],
-        expected=[f"{k}={v}" for k, v in config["tracks"]["hecate_bwt"]["sha256"].items()]
+        expected=[f"{k}={v}" for k, v in config["tracks"]["hecate_bwt"]["sha256"].items()],
+        strict="--strict" if config["tracks"]["hecate_bwt"].get("strict_hash", False) else ""
     run:
         expected = " ".join(f"--expected {e}" for e in params.expected)
         shell("python3 packages/pipeline/scripts/common/check_hecate.py --binary {input.binary} "
-              "--commit {params.commit} {expected} -o {output.info}")
+              "--commit {params.commit} {expected} {params.strict} -o {output.info}")
 
 rule compute_hecate_mprob:
     input:

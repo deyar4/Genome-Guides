@@ -41,9 +41,11 @@ tracks:
     kmer_length: 21
     window_size: 100
     chunk_windows: 1000
-    # Pinned upstream build (D32). The binary is not tracked in git; the workflow checks its sha256 before every use
-    # and builds it from the pinned commit if it is absent. The reported version is "1.0" for every commit, so the
-    # commit and hash are the only identity.
+    # Pinned upstream build (D32). The binary is not tracked in git; if it is absent the workflow builds it from the
+    # pinned commit (needs git, Rust, a C compiler with OpenMP). The reported version is "1.0" for every commit, so
+    # commit and hash are the identity. The hash is always recorded in data/interim/hecate_binary.txt; a mismatch
+    # only warns (another toolchain can differ) unless strict_hash is true (reference machine, Docker image).
+    strict_hash: false
     repo: "https://gitlab.com/rahmannlab/hecate.git"
     commit: "76b48360b52130b9e6149a1c90984d4ed74757f3"
     binary: "tools/hecate/hecate"
