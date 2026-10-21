@@ -3,13 +3,13 @@ import React from "react";
 interface InspectorPanelProps {
   hoverCoord: number | null;
   hoverData: {
-    gc?: number;
+    gc?: number | null;
     skew?: number | null;
     gap?: string;
     homopolymer?: string;
-    entropy?: number;
-    geneDensity?: number;
-    repeatDensity?: number;
+    entropy?: number | null;
+    geneDensity?: number | null;
+    repeatDensity?: number | null;
     gene?: string;
     repeat?: string;
     hecate_entropy?: number | null;
@@ -21,7 +21,7 @@ export function InspectorPanel({ hoverCoord, hoverData }: InspectorPanelProps) {
     <div className="bg-background p-6 rounded-xl border border-border flex flex-col gap-4">
           <div className="border-b border-border pb-2">
             <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Position Inspector</h3>
-            <p className="text-[11px] text-muted-foreground">Move your pointer over the canvas to inspect DNA, RNA, protein, and repeat metrics in real-time.</p>
+            <p className="text-[11px] text-muted-foreground">Move the pointer over the canvas. Values are those of the bin or feature under the pointer; N/A means no data there (not zero). Coordinates are 0-based.</p>
           </div>
 
           {hoverCoord !== null && hoverData ? (
@@ -29,17 +29,17 @@ export function InspectorPanel({ hoverCoord, hoverData }: InspectorPanelProps) {
               <div className="p-3 bg-card border border-border rounded-lg">
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Coordinate & Complexity</div>
                 <div className="text-foreground font-bold mt-1">{hoverCoord.toLocaleString()} bp</div>
-                <div className="text-chart-3 font-bold mt-1">Entropy: {hoverData.entropy !== undefined ? hoverData.entropy.toFixed(3) : "N/A"}</div>
+                <div className="text-chart-3 font-bold mt-1">Shannon entropy (base composition): {hoverData.entropy != null ? `${hoverData.entropy.toFixed(3)} bits` : "N/A"}</div>
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Composition (GC)</div>
                 <div className="text-chart-1 font-bold mt-1">GC Content: {hoverData.gc != null ? `${hoverData.gc.toFixed(2)}%` : "N/A"}</div>
-                <div className="text-chart-4 font-bold mt-1">GC Skew: {hoverData.skew != null ? hoverData.skew.toFixed(4) : "N/A"}</div>
+                <div className="text-chart-4 font-bold mt-1">GC Skew: {hoverData.skew != null ? `${hoverData.skew.toFixed(2)}%` : "N/A"}</div>
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">
-                <div className="text-[9px] font-bold text-muted-foreground uppercase">Annotation Densities</div>
-                <div className="text-chart-2 font-bold mt-1">Gene Density: {hoverData.geneDensity !== undefined ? hoverData.geneDensity.toFixed(2) : "N/A"}</div>
-                <div className="text-chart-3 font-bold mt-1">Repeat Density: {hoverData.repeatDensity !== undefined ? hoverData.repeatDensity.toFixed(2) : "N/A"}</div>
+                <div className="text-[9px] font-bold text-muted-foreground uppercase">Annotation Counts &amp; Model Rate</div>
+                <div className="text-chart-2 font-bold mt-1">Gene count per window: {hoverData.geneDensity != null ? hoverData.geneDensity.toFixed(2) : "N/A"}</div>
+                <div className="text-chart-3 font-bold mt-1">Repeat count per window: {hoverData.repeatDensity != null ? hoverData.repeatDensity.toFixed(2) : "N/A"}</div>
                 <div className="text-chart-1 font-bold mt-1">Hecate cross-entropy: {hoverData.hecate_entropy != null ? `${hoverData.hecate_entropy.toFixed(3)} bits/base` : "N/A"}</div>
               </div>
               <div className="p-3 bg-card border border-border rounded-lg">

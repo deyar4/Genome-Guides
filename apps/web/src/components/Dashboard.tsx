@@ -4,9 +4,10 @@ interface DashboardProps {
   startPos: number;
   endPos: number;
   currentMaxLen: number;
+  activeTracks?: number;
 }
 
-export function Dashboard({ startPos, endPos, currentMaxLen }: DashboardProps) {
+export function Dashboard({ startPos, endPos, currentMaxLen, activeTracks }: DashboardProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-background p-4 rounded-xl border border-border shadow-sm flex flex-col justify-between">
@@ -27,7 +28,7 @@ export function Dashboard({ startPos, endPos, currentMaxLen }: DashboardProps) {
           <div className="bg-background p-4 rounded-xl border border-border shadow-sm flex flex-col justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Data Streams</span>
             <span className="text-sm font-bold text-secondary-foreground mt-1 flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span> 5 active tracks
+              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span> {activeTracks ?? 0} visible tracks
             </span>
           </div>
         </div>

@@ -10,10 +10,18 @@ export interface TrackConfig {
   height: number;
 }
 
+// null = no data at this position (shown as N/A); undefined only before a value is looked up
 export interface HoverData {
-  gc?: number;
+  gc?: number | null;
   skew?: number | null;
+  entropy?: number | null;
+  geneDensity?: number | null;
+  repeatDensity?: number | null;
   hecate_entropy?: number | null;
+  gene?: string;
+  repeat?: string;
+  gap?: string;
+  homopolymer?: string;
 }
 
 interface BrowserCanvasProps {
@@ -31,6 +39,8 @@ interface BrowserCanvasProps {
     repeatFamilyData: RepeatFamilyFeature[];
     hecateMprobData: HecateMprobPoint[];
   };
+  /** track names the API capped (truncated: true) for the current window */
+  truncatedTracks?: Record<string, boolean>;
   tracks: TrackConfig[];
   theme: string | undefined;
   hoverCoord: number | null;
@@ -40,10 +50,21 @@ interface BrowserCanvasProps {
   setEndPos: (pos: number) => void;
 }
 
-export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, theme, hoverCoord, setHoverCoord, setHoverData, setStartPos, setEndPos }: BrowserCanvasProps) {
+export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncatedTracks = {}, tracks, theme, hoverCoord, setHoverCoord, setHoverData, setStartPos, setEndPos }: BrowserCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragStartRef = useRef<{ x: number; start: number; end: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Canvas pixel width follows the container so text and features are not stretched/squashed by CSS scaling.
+  const [canvasWidth, setCanvasWidth] = React.useState(1800);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setCanvasWidth(Math.max(320, Math.floor(el.clientWidth)));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   
   const { gcData, gapData, homopolymerData, entropyData, geneDensityData, repeatDensityData, geneModelData, repeatFamilyData, hecateMprobData } = data;
 
@@ -157,25 +178,37 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
           ctx.beginPath();
           let first = true;
           gcData.forEach((pt) => {
+            // a missing bin breaks the line instead of drawing a value
+            if (pt.avg_value == null) { first = true; return; }
             const x = bpToX(pt.bin_start);
-            const y = currentTop + track.height - ((pt.avg_value - 20) / 60) * track.height;
+            const y = currentTop + track.height - 6 - Math.max(0, Math.min(1, (pt.avg_value - 20) / 60)) * (track.height - 32);
             if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
           });
           ctx.strokeStyle = isDark ? "#22d3ee" : "#0284c7";
           ctx.lineWidth = 1.5;
           ctx.stroke();
+          ctx.fillStyle = colors.trackTitle;
+          ctx.font = "9px monospace";
+          ctx.textAlign = "right";
+          ctx.fillText("GC %, display range 20 to 80 (clamped)", width - 8, currentTop + 14);
         } 
         else if (track.id === 'entropy' && entropyData.length > 0) {
           ctx.beginPath();
           let first = true;
           entropyData.forEach((pt) => {
+            // NULL entropy (window with too few ACGT bases) breaks the line; never substitute a value
+            if (pt.avg_shannon_entropy == null) { first = true; return; }
             const x = bpToX(pt.bin_start);
-            const y = currentTop + track.height - (((pt.avg_shannon_entropy ?? 1.5) - 0.8) / 1.2) * track.height;
+            const y = currentTop + track.height - 6 - Math.max(0, Math.min(1, (pt.avg_shannon_entropy - 0.8) / 1.2)) * (track.height - 32);
             if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
           });
           ctx.strokeStyle = isDark ? "#fbbf24" : "#d97706";
           ctx.lineWidth = 1.5;
           ctx.stroke();
+          ctx.fillStyle = colors.trackTitle;
+          ctx.font = "9px monospace";
+          ctx.textAlign = "right";
+          ctx.fillText("bits (base composition), display range 0.8 to 2.0 (clamped)", width - 8, currentTop + 14);
         }
         else if ((track.id === 'density' && geneDensityData.length > 0) || (track.id === 'repeat-density' && repeatDensityData.length > 0)) {
           const plotTop = currentTop + 26;
@@ -191,11 +224,16 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
               ctx.fillRect(x, plotTop + plotHeight - barHeight, barWidth, barHeight);
             });
           };
+          const densityScale = track.id === 'density' ? 15 : 500;
           if (track.id === 'density') {
-            drawDensity(geneDensityData.map(pt => ({ bin_start: pt.bin_start, value: pt.avg_count })), isDark ? "rgba(52, 211, 153, 0.8)" : "rgba(5, 150, 105, 0.72)", 15);
+            drawDensity(geneDensityData.map(pt => ({ bin_start: pt.bin_start, value: pt.avg_count })), isDark ? "rgba(52, 211, 153, 0.8)" : "rgba(5, 150, 105, 0.72)", densityScale);
           } else {
-            drawDensity(repeatDensityData.map(pt => ({ bin_start: pt.bin_start, value: pt.avg_te_count })), isDark ? "rgba(251, 146, 60, 0.8)" : "rgba(234, 88, 12, 0.72)", 500);
+            drawDensity(repeatDensityData.map(pt => ({ bin_start: pt.bin_start, value: pt.avg_te_count })), isDark ? "rgba(251, 146, 60, 0.8)" : "rgba(234, 88, 12, 0.72)", densityScale);
           }
+          ctx.fillStyle = colors.trackTitle;
+          ctx.font = "9px monospace";
+          ctx.textAlign = "right";
+          ctx.fillText(`bar height: count per window, display max ${densityScale} (clamped)`, width - 8, currentTop + 14);
         }
         else if (track.id === 'gaps') {
           gapData.forEach((gap) => {
@@ -267,11 +305,32 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
           ctx.textAlign = "right";
           ctx.fillText(`${maxBits.toFixed(1)} bits/base`, width - 8, plotTop + 9);
           ctx.fillText("0", width - 8, plotTop + plotHeight);
-        } else if (track.id === 'repeat-density' || track.id === 'hecate') {
+        }
+
+        // explicit empty / capped notices (an empty lane must not be read as a measured zero)
+        const emptyMessages: Record<string, [boolean, string]> = {
+          'gc': [gcData.length === 0, "No GC data in this window"],
+          'entropy': [entropyData.length === 0, "No Shannon entropy data in this window"],
+          'density': [geneDensityData.length === 0, "No gene density data in this window"],
+          'repeat-density': [repeatDensityData.length === 0, "No repeat density data in this window"],
+          'gaps': [gapData.length === 0 && homopolymerData.length === 0, "No assembly gaps or homopolymer runs in this window (T2T has no gaps)"],
+          'models': [geneModelData.length === 0 && repeatFamilyData.length === 0, "No gene models or repeats in this window"],
+          'hecate': [hecateMprobData.length === 0, "No Hecate cross-entropy data in this window"],
+        };
+        const [isEmpty, emptyText] = emptyMessages[track.id] ?? [false, ""];
+        if (isEmpty) {
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "10px sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText(track.id === 'repeat-density' ? "No repeat density data for this contig" : "No Hecate cross-entropy data for this contig", width / 2, currentTop + track.height / 2 + 8);
+          ctx.fillText(emptyText, width / 2, currentTop + track.height / 2 + 8);
+        }
+        const capped = track.id === 'gaps' ? (truncatedTracks['homopolymer_genomic_tracts'] || truncatedTracks['assembly_gaps'])
+          : track.id === 'models' ? (truncatedTracks['gene_models'] || truncatedTracks['repeatmasker_families']) : false;
+        if (capped) {
+          ctx.fillStyle = isDark ? "#fbbf24" : "#b45309";
+          ctx.font = "9px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText("API returned only the first 5,000 features here; zoom in to see all", width - 8, currentTop + 14);
         }
         
         currentTop += track.height + trackPadding;
@@ -304,7 +363,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
     drawRuler();
     drawTracks();
     drawHover();
-  }, [startPos, endPos, data, hoverCoord, visibleTracks, theme, colors, trackPadding, rulerHeight, isDark, gcData, gapData, homopolymerData, entropyData, geneDensityData, repeatDensityData, geneModelData, repeatFamilyData, hecateMprobData]);
+  }, [startPos, endPos, data, hoverCoord, visibleTracks, theme, colors, trackPadding, rulerHeight, isDark, canvasWidth, truncatedTracks, gcData, gapData, homopolymerData, entropyData, geneDensityData, repeatDensityData, geneModelData, repeatFamilyData, hecateMprobData]);
 
   const handleZoom = (factor: number, anchorBp?: number) => {
     const currentLen = endPos - startPos;
@@ -343,18 +402,32 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
 
     if (hoveredBp >= 0 && hoveredBp <= currentMaxLen) {
       setHoverCoord(hoveredBp);
-      const point = gcData.reduce(
-        (prev, curr) => Math.abs(curr.bin_start - hoveredBp) < Math.abs(prev.bin_start - hoveredBp) ? curr : prev,
-        gcData[0]
-      );
-      const hecatePoint = hecateMprobData?.reduce(
-        (prev, curr) => Math.abs(curr.bin_start - hoveredBp) < Math.abs(prev.bin_start - hoveredBp) ? curr : prev,
-        hecateMprobData[0]
-      );
+      // value of the bin that contains the pointer; null when no bin covers it (never the nearest bin)
+      const inBin = <T extends { bin_start: number; bin_end?: number }>(arr: T[]): T | null =>
+        arr.find((d) => hoveredBp >= d.bin_start && hoveredBp < (d.bin_end ?? d.bin_start + 1)) ?? null;
+      const point = inBin(gcData);
+      const entropyPoint = inBin(entropyData);
+      const geneDensityPoint = inBin(geneDensityData);
+      const repeatDensityPoint = inBin(repeatDensityData);
+      const hecatePoint = inBin(hecateMprobData ?? []);
+      const covering = <T extends { start_pos: number; end_pos: number }>(arr: T[]) =>
+        arr.filter((f) => hoveredBp >= f.start_pos && hoveredBp < f.end_pos);
+      const genes = covering(geneModelData);
+      const repeats = covering(repeatFamilyData);
+      const gaps = covering(gapData);
+      const runs = covering(homopolymerData);
+      const list = (items: string[]) => items.slice(0, 3).join("; ") + (items.length > 3 ? ` (+${items.length - 3} more)` : "");
       setHoverData({
-        gc: point?.avg_value,
-        skew: point?.avg_skew,
-        hecate_entropy: hecatePoint?.mean_entropy
+        gc: point?.avg_value ?? null,
+        skew: point?.avg_skew ?? null,
+        entropy: entropyPoint?.avg_shannon_entropy ?? null,
+        geneDensity: geneDensityPoint?.avg_count ?? null,
+        repeatDensity: repeatDensityPoint?.avg_te_count ?? null,
+        hecate_entropy: hecatePoint?.mean_entropy ?? null,
+        gene: genes.length ? list(genes.map((g) => `${g.gene_name || g.gene_id} (${g.biotype}, ${g.strand}) ${g.start_pos.toLocaleString()}-${g.end_pos.toLocaleString()}`)) : undefined,
+        repeat: repeats.length ? list(repeats.map((r) => `${r.te_name} (${r.te_class}) ${r.start_pos.toLocaleString()}-${r.end_pos.toLocaleString()}`)) : undefined,
+        gap: gaps.length ? list(gaps.map((g) => `${g.start_pos.toLocaleString()}-${g.end_pos.toLocaleString()}${g.gap_type ? ` ${g.gap_type}` : ""}`)) : undefined,
+        homopolymer: runs.length ? list(runs.map((h) => `${h.base} x ${h.run_length} (${h.start_pos.toLocaleString()}-${h.end_pos.toLocaleString()})`)) : undefined,
       });
     }
 
@@ -394,7 +467,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, tracks, t
     <div ref={containerRef} className="relative w-full h-[760px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-card" onWheel={handleWheel}>
       <canvas
         ref={canvasRef}
-        width={1800}
+        width={canvasWidth}
         height={totalHeight}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

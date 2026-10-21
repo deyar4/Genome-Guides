@@ -8,13 +8,15 @@ import { InspectorPanel } from "@/components/InspectorPanel";
 import { BrowserCanvas, TrackConfig, HoverData } from "@/components/browser/BrowserCanvas";
 import { BrowserControls } from "@/components/browser/BrowserControls";
 import { Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { dnaApi } from "@/lib/api";
 import { useTheme } from "next-themes";
 
 const DEFAULT_TRACKS: TrackConfig[] = [
-  { id: 'gc', title: 'GC CONTENT / SKEW', visible: true, order: 1, height: 92 },
-  { id: 'entropy', title: 'SHANNON ENTROPY', visible: true, order: 2, height: 92 },
-  { id: 'density', title: 'GENE DENSITY', visible: true, order: 3, height: 92 },
-  { id: 'repeat-density', title: 'REPEAT DENSITY', visible: true, order: 4, height: 92 },
+  { id: 'gc', title: 'GC CONTENT (%)', visible: true, order: 1, height: 92 },
+  { id: 'entropy', title: 'SHANNON ENTROPY OF BASE COMPOSITION (BITS)', visible: true, order: 2, height: 92 },
+  { id: 'density', title: 'GENE COUNT PER WINDOW', visible: true, order: 3, height: 92 },
+  { id: 'repeat-density', title: 'REPEAT COUNT PER WINDOW', visible: true, order: 4, height: 92 },
   { id: 'gaps', title: 'ASSEMBLY GAPS / HOMOPOLYMERS', visible: true, order: 5, height: 58 },
   { id: 'models', title: 'GENE MODELS / REPEATS', visible: true, order: 6, height: 58 },
   { id: 'hecate', title: 'HECATE CROSS-ENTROPY RATE (BITS/BASE, 1 KB WINDOWS)', visible: true, order: 7, height: 128 }
@@ -28,8 +30,22 @@ export default function GenomeBrowserPage() {
 function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLengths }) {
   const { theme } = useTheme();
   
-  const availableContigs = Object.keys(genomeLengths[activeGenome] || {});
-  const initialContig = availableContigs[0] || "chr1";
+  // Contig names and lengths come from the API; the static table is only a fallback while loading or on error.
+  const { data: chromData } = useQuery({
+    queryKey: ['chromosomes', activeGenome],
+    queryFn: () => dnaApi.getChromosomes(activeGenome),
+  });
+  const apiLengths = React.useMemo(() => {
+    const out: Record<string, number> = {};
+    (chromData?.chromosomes ?? [])
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+      .forEach(c => { out[c.name] = c.length; });
+    return out;
+  }, [chromData]);
+  const lengths = Object.keys(apiLengths).length > 0 ? apiLengths : (genomeLengths[activeGenome] || {});
+  const availableContigs = Object.keys(lengths);
+  const initialContig = Object.keys(genomeLengths[activeGenome] || {})[0] || "chr1";
   const initialEnd = Math.min(100000, genomeLengths[activeGenome]?.[initialContig] || 100000);
   
   const [selectedContig, setSelectedContig] = useState<string>(initialContig);
@@ -39,12 +55,22 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
   const [hoverData, setHoverData] = useState<HoverData | null>(null);
   const [tracks, setTracks] = useState<TrackConfig[]>(DEFAULT_TRACKS);
 
-  const { currentMaxLen, loading, data } = useGenomeData(
+  const { currentMaxLen, loading, data, truncatedTracks } = useGenomeData(
     activeGenome,
     selectedContig,
     startPos,
-    endPos
+    endPos,
+    lengths[selectedContig]
   );
+
+  const handleContigChange = (contig: string) => {
+    // reset the viewport so it never exceeds the new contig
+    setSelectedContig(contig);
+    setStartPos(0);
+    setEndPos(Math.min(100000, lengths[contig] || 100000));
+    setHoverCoord(null);
+    setHoverData(null);
+  };
 
   const handlePan = (bpDelta: number) => {
     const len = endPos - startPos;
@@ -96,7 +122,7 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
         {/* CONTROL PANEL */}
         <BrowserControls
           selectedContig={selectedContig}
-          setSelectedContig={setSelectedContig}
+          setSelectedContig={handleContigChange}
           availableContigs={availableContigs}
           startPos={startPos}
           endPos={endPos}
@@ -109,7 +135,7 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
         />
 
         {/* DASHBOARD */}
-        <Dashboard startPos={startPos} endPos={endPos} currentMaxLen={currentMaxLen} />
+        <Dashboard startPos={startPos} endPos={endPos} currentMaxLen={currentMaxLen} activeTracks={tracks.filter(t => t.visible).length} />
 
         {/* BROWSER VIEWPORT */}
         <div className="bg-card rounded-xl border border-border overflow-hidden flex flex-col relative shadow-md">
@@ -125,6 +151,7 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
             endPos={endPos} 
             currentMaxLen={currentMaxLen}
             data={data}
+            truncatedTracks={truncatedTracks}
             tracks={tracks}
             theme={theme}
             hoverCoord={hoverCoord}
@@ -135,8 +162,8 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
           />
           
           <div className="px-4 py-2 border-t border-border bg-secondary/20 text-[10px] text-muted-foreground flex items-center justify-between">
-            <span>💡 Click and drag to pan. Scroll mouse wheel (with Ctrl/Cmd) to zoom in/out at pointer.</span>
-            <span>Viewport scale: {((endPos - startPos) / 1200).toFixed(2)} bp/px</span>
+            <span>Click and drag to pan. Scroll the mouse wheel with Ctrl/Cmd held to zoom at the pointer.</span>
+            <span>Viewport: {(endPos - startPos).toLocaleString()} bp (data are binned to at most 1,200 points, never finer than 1 kb)</span>
           </div>
         </div>
 
