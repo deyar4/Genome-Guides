@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/card';
 export default function LibraryOverview() {
   const { activeGenome } = useGenomeStore();
 
-  const assemblyName = activeGenome === 'hs1' ? 'T2T-CHM13' : activeGenome.toUpperCase();
+  const assemblyName = activeGenome === 't2t' || activeGenome === 'hs1' ? 'T2T-CHM13v2.0' : activeGenome;
 
   const { data: dnaSummary } = useQuery({
     queryKey: ['dna-summary', activeGenome],
@@ -23,6 +23,11 @@ export default function LibraryOverview() {
   const { data: geneSummary } = useQuery({
     queryKey: ['gene-summary', activeGenome],
     queryFn: () => genesApi.getSummary(activeGenome),
+  });
+
+  const { data: chromosomes } = useQuery({
+    queryKey: ['chromosomes', activeGenome],
+    queryFn: () => dnaApi.getChromosomes(activeGenome),
   });
 
   const proteinCodingCount = useMemo(() => {
@@ -37,10 +42,10 @@ export default function LibraryOverview() {
   }, [geneSummary, dnaSummary]);
 
   const nuclearLength = useMemo(() => {
-    if (!dnaSummary?.nuclear_composition) return 0;
-    const c = dnaSummary.nuclear_composition;
-    return c.a + c.c + c.g + c.t + c.n;
-  }, [dnaSummary]);
+    // sum over non-mitochondrial sequences: the API's nuclear_composition equals the whole-assembly total (includes chrM)
+    if (!chromosomes?.chromosomes) return 0;
+    return chromosomes.chromosomes.filter(c => !c.is_mitochondrial).reduce((acc, c) => acc + c.length, 0);
+  }, [chromosomes]);
 
   return (
     <LibraryShell 
@@ -74,7 +79,7 @@ export default function LibraryOverview() {
           <GenomicMetricCard 
             label="Protein Coding"
             value={proteinCodingCount > 0 ? formatNumber(proteinCodingCount) : '...'}
-            description="Validated functional protein-encoding genes."
+            description="Genes with biotype protein_coding."
             color="#f59e0b"
           />
         </div>
@@ -120,11 +125,11 @@ export default function LibraryOverview() {
                       </li>
                       <li className="flex items-center gap-3 text-[10px] font-medium text-slate-300">
                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                         Click chromosomes to filter
+                         Click a chromosome on the Chromosome Metrics map to select it
                       </li>
                       <li className="flex items-center gap-3 text-[10px] font-medium text-slate-300">
                          <div className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                         Export sequences in 1-click
+                         Download a gene&apos;s sequence as FASTA from its gene page
                       </li>
                    </ul>
                 </div>
@@ -140,7 +145,7 @@ export default function LibraryOverview() {
                    {[
                      { label: 'DNA Analysis', status: 'Ready', desc: 'Assembly metrics & composition' },
                      { label: 'Gene Census', status: 'Ready', desc: 'Biotype distribution & search' },
-                     { label: 'RNA Clusters', status: 'Beta', desc: 'ncRNA hubs & nesting' },
+                     { label: 'RNA Clusters', status: 'Beta', desc: 'ncRNA clusters (nested-gene analysis not yet available)' },
                      { label: 'Protein Census', status: 'Beta', desc: 'Proteomic composition' },
                    ].map((m, i) => (
                      <li key={i} className="group cursor-default">

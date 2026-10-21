@@ -13,6 +13,7 @@ import {
   Info,
   BookOpen,
   Map,
+  Layers,
   X
 } from 'lucide-react';
 import Link from 'next/link';
@@ -59,6 +60,7 @@ const navigation: NavSection[] = [
     items: [
       { href: '/library/genes/census', label: 'Biotype Census', icon: Library },
       { href: '/library/genes/search', label: 'Gene Reference', icon: Search },
+      { href: '/library/genes/architecture', label: 'Architecture & Size', icon: Layers },
       { href: '/library/genes/distribution', label: 'Genomic Distribution', icon: Target },
       { href: '/library/genes/correlations', label: 'Genomic Correlations', icon: Activity },
       { href: '/library/genes/spacing', label: 'Spacing & Overlaps', icon: Shapes },
@@ -123,7 +125,7 @@ export function SidebarNav({ className, mobileOpen = false, onClose }: { classNa
             <SelectContent>
               {availableGenomes.map((g) => (
                 <SelectItem key={g} value={g}>
-                  {g === 'hs1' ? 'T2T-CHM13' : g === 'hg38' ? 'GRCh38' : g}
+                  {g === 't2t' || g === 'hs1' ? 'T2T-CHM13v2.0' : g === 'chrm' ? 'chrM test build' : g}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -172,7 +174,7 @@ export function SidebarNav({ className, mobileOpen = false, onClose }: { classNa
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-bold text-muted-foreground uppercase mb-0.5 tracking-tight">Active Reference</div>
             <div className="text-xs font-mono font-bold text-foreground truncate">
-              {activeGenome === 'hs1' ? 'T2T-CHM13' : activeGenome === 'hg38' ? 'GRCh38.p14' : activeGenome.toUpperCase()}
+              {activeGenome === 't2t' || activeGenome === 'hs1' ? 'T2T-CHM13v2.0' : activeGenome}
             </div>
           </div>
         </div>
