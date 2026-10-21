@@ -57,3 +57,20 @@ def test_soft_masked_bases_are_scanned(tmp_path):
     mixed.write_text("\n".join(l if l.startswith(">") else "".join(c.lower() if rng.random() < 0.5 else c for c in l)
                                for l in fa.read_text().splitlines()) + "\n")
     assert hits(tmp_path, mixed, 500, "mx") == up
+
+
+def test_scan_matches_all_pairs_definition_and_is_fast():
+    import time
+    from extract_ssrs import scan
+    rng = random.Random(7)
+    seq = "".join(rng.choice("ACGT") for _ in range(3000)) + "ACACACACAC" * 5000   # many candidates in one long array
+    seq += "".join(rng.choice("AC") for _ in range(200_000))                          # low-complexity: many short candidates
+    t = time.time()
+    got = scan("c", seq)
+    assert time.time() - t < 30
+    # reference: the original definition on a small prefix
+    small = seq[:3000] + seq[3000:3200] + seq[-3000:]
+    cands = scan("c", small)
+    for h in cands:
+        assert not any(h is not o and h["start"] >= o["start"] and h["end"] <= o["end"] for o in cands)
+    assert len(got) > 1000

@@ -38,11 +38,16 @@ def scan(chrom, sequence):
                 "complexity": len(set(motif)) / period,
             })
     # Prefer the longest call at a coordinate and remove nested calls.
+    # Sorted by start, a hit is nested in an earlier selected hit iff that hit's end >= this end, so the running maximum end
+    # of the selected hits decides (O(n log n); the earlier all-pairs check was quadratic and stalled once lowercase
+    # sequence was scanned too).
     selected = []
+    max_end = -1
     for hit in sorted(candidates, key=lambda x: (x["start"], -x["length"], x["period"])):
-        if any(hit["start"] >= old["start"] and hit["end"] <= old["end"] for old in selected):
+        if hit["end"] <= max_end:
             continue
         selected.append(hit)
+        max_end = hit["end"]
     return selected
 
 
