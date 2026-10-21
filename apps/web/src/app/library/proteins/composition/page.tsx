@@ -14,45 +14,28 @@ export default function ProteinCompositionPage() {
   const { activeGenome } = useGenomeStore();
   const chartTheme = useChartTheme();
 
-  const { data: nuclearComp, isLoading: nuclearLoading } = useQuery({
-    queryKey: ['protein-composition-nuclear', activeGenome],
-    queryFn: () => proteinsApi.getComposition(activeGenome, false),
+  const { data: nuclearComp, isLoading: compositionLoading } = useQuery({
+    queryKey: ['protein-composition-global', activeGenome],
+    queryFn: () => proteinsApi.getComposition(activeGenome),
   });
 
-  const { data: mitochondrialComp, isLoading: mtLoading } = useQuery({
-    queryKey: ['protein-composition-mt', activeGenome],
-    queryFn: () => proteinsApi.getComposition(activeGenome, true),
+  // One response carries both termini (n_terminal_pct / c_terminal_pct); the API takes no terminal or k parameter.
+  const { data: terminalComp, isLoading: terminalLoading } = useQuery({
+    queryKey: ['protein-composition-terminal', activeGenome],
+    queryFn: () => proteinsApi.getTerminalComposition(activeGenome),
   });
 
-  const { data: nTerminalComp, isLoading: nTerminalLoading } = useQuery({
-    queryKey: ['protein-composition-n-term', activeGenome],
-    queryFn: () => proteinsApi.getTerminalComposition(activeGenome, { terminal: 'N', k: 10 }),
-  });
-
-  const { data: cTerminalComp, isLoading: cTerminalLoading } = useQuery({
-    queryKey: ['protein-composition-c-term', activeGenome],
-    queryFn: () => proteinsApi.getTerminalComposition(activeGenome, { terminal: 'C', k: 10 }),
-  });
-
-  const comparisonData = useMemo(() => {
-    if (!nuclearComp || !mitochondrialComp) return [];
-    
-    // Create a map of AA to their percentages
-    const mtMap = new Map(mitochondrialComp.map(c => [c.amino_acid, c.percentage]));
-    
+  const compositionData = useMemo(() => {
+    if (!nuclearComp) return [];
     return nuclearComp
-      .map(c => ({
-        aa: c.amino_acid,
-        nuclear: c.percentage,
-        mitochondrial: mtMap.get(c.amino_acid) || 0,
-      }))
-      .sort((a, b) => b.nuclear - a.nuclear);
-  }, [nuclearComp, mitochondrialComp]);
+      .map(c => ({ aa: c.amino_acid, frequency: c.percentage }))
+      .sort((a, b) => b.frequency - a.frequency);
+  }, [nuclearComp]);
 
   return (
     <LibraryShell 
       title="Amino Acid Composition" 
-      subtitle="Comparative analysis of residue frequencies between nuclear and mitochondrial proteomes."
+      subtitle="Residue frequencies over all protein records, and amino acid usage at the protein termini."
     >
       <div className="space-y-12 pb-20">
         
@@ -61,10 +44,9 @@ export default function ProteinCompositionPage() {
               <Info className="h-5 w-5 text-amber-600 dark:text-amber-400" />
            </div>
            <div className="space-y-2">
-              <h4 className="font-bold text-amber-900 dark:text-amber-100">Evolutionary Divergence</h4>
+              <h4 className="font-bold text-amber-900 dark:text-amber-100">Mitochondrial comparison unavailable</h4>
               <p className="text-sm text-amber-700/80 dark:text-amber-300/80 leading-relaxed">
-                Mitochondrial proteins often exhibit significant compositional differences compared to nuclear-encoded proteins, 
-                reflecting their unique evolutionary origin and the specific constraints of the mitochondrial environment.
+                The composition endpoint has no nuclear/mitochondrial split: asking for either returns the same all-protein table, so a nuclear versus mitochondrial comparison is not shown.
               </p>
            </div>
         </div>
@@ -74,24 +56,24 @@ export default function ProteinCompositionPage() {
            <div className="flex items-center justify-between mb-8">
               <h3 className="text-xl font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
                  <Activity className="h-5 w-5 text-primary" />
-                 Nuclear vs. Mitochondrial Frequency
+                 Amino Acid Frequency (all protein records)
               </h3>
            </div>
 
            <div className="flex-1 min-h-0">
-             {(nuclearLoading || mtLoading) ? (
+             {compositionLoading ? (
                 <div className="h-full w-full flex items-center justify-center">
                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 </div>
              ) : (
                <ResponsiveBar
-                 data={comparisonData}
-                 keys={['nuclear', 'mitochondrial']}
+                 data={compositionData}
+                 keys={['frequency']}
                  indexBy="aa"
-                 margin={{ top: 20, right: 130, bottom: 50, left: 60 }}
+                 margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
                  padding={0.3}
                  groupMode="grouped"
-                 colors={['#3b82f6', '#ec4899']}
+                 colors={['#3b82f6']}
                  borderRadius={4}
                  theme={chartTheme}
                  axisBottom={{
@@ -112,44 +94,29 @@ export default function ProteinCompositionPage() {
                    format: '.1f'
                  }}
                  enableLabel={false}
-                 legends={[
-                    {
-                      dataFrom: 'keys',
-                      anchor: 'bottom-right',
-                      direction: 'column',
-                      justify: false,
-                      translateX: 120,
-                      translateY: 0,
-                      itemsSpacing: 2,
-                      itemWidth: 100,
-                      itemHeight: 20,
-                      itemDirection: 'left-to-right',
-                      itemOpacity: 0.85,
-                      symbolSize: 20,
-                    }
-                 ]}
                />
              )}
            </div>
         </Card>
 
+        <p className="text-xs text-slate-500">Terminal usage is computed over proteins of at least 40 residues (pipeline script extract_protein_terminal_bias.py).</p>
         {/* TERMINAL COMPOSITION CHARTS */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
            <Card className="p-8 bg-white dark:bg-zinc-950 border-slate-200 dark:border-zinc-800 shadow-sm h-[500px] flex flex-col">
               <div className="flex items-center justify-between mb-8">
                  <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest flex items-center gap-2">
                     <AlignLeft className="h-4 w-4 text-emerald-500" />
-                    N-Terminal Bias (First 10 AA)
+                    N-Terminal Usage (first 20 residues)
                  </h3>
               </div>
               <div className="flex-1 min-h-0">
-                 {nTerminalLoading ? (
+                 {terminalLoading ? (
                     <div className="h-full w-full flex items-center justify-center">
                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
                     </div>
                  ) : (
                     <ResponsiveBar
-                      data={(nTerminalComp || []).map(c => ({ amino_acid: c.amino_acid, percentage: c.percentage }))}
+                      data={(terminalComp || []).map(c => ({ amino_acid: c.amino_acid, percentage: c.n_terminal_pct }))}
                       keys={['percentage']}
                       indexBy="amino_acid"
                       margin={{ top: 20, right: 20, bottom: 50, left: 60 }}
@@ -181,17 +148,17 @@ export default function ProteinCompositionPage() {
               <div className="flex items-center justify-between mb-8">
                  <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest flex items-center gap-2">
                     <AlignRight className="h-4 w-4 text-amber-500" />
-                    C-Terminal Bias (Last 10 AA)
+                    C-Terminal Usage (last 20 residues)
                  </h3>
               </div>
               <div className="flex-1 min-h-0">
-                 {cTerminalLoading ? (
+                 {terminalLoading ? (
                     <div className="h-full w-full flex items-center justify-center">
                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
                     </div>
                  ) : (
                     <ResponsiveBar
-                      data={(cTerminalComp || []).map(c => ({ amino_acid: c.amino_acid, percentage: c.percentage }))}
+                      data={(terminalComp || []).map(c => ({ amino_acid: c.amino_acid, percentage: c.c_terminal_pct }))}
                       keys={['percentage']}
                       indexBy="amino_acid"
                       margin={{ top: 20, right: 20, bottom: 50, left: 60 }}

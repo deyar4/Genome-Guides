@@ -13,11 +13,10 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn, formatNumber } from '@/lib/utils';
-import { Target, Zap, Hash, ExternalLink } from 'lucide-react';
+import { formatNumber } from '@/lib/utils';
+import { Target, Zap, Hash } from 'lucide-react';
 
 export default function ProteinFeaturesPage() {
   const { activeGenome } = useGenomeStore();
@@ -29,8 +28,14 @@ export default function ProteinFeaturesPage() {
 
   const { data: tracts, isLoading: tractsLoading } = useQuery({
     queryKey: ['proteins-tracts', activeGenome],
-    queryFn: () => proteinsApi.getHomopolymerTracts(activeGenome, { min_length: 10, limit: 100 }),
+    queryFn: () => proteinsApi.getHomopolymerTracts(activeGenome),
   });
+
+  // The API returns every tract of length >= 5 (min_length / limit are ignored), so select client-side.
+  const topTracts = React.useMemo(
+    () => [...(tracts ?? [])].filter(t => t.length >= 10).sort((a, b) => b.length - a.length).slice(0, 100),
+    [tracts]
+  );
 
   return (
     <LibraryShell 
@@ -55,8 +60,7 @@ export default function ProteinFeaturesPage() {
                     <Target className="h-5 w-5 text-primary" />
                  </div>
                  <p className="text-sm leading-relaxed">
-                    Polypeptide length is a fundamental property of proteins. The largest proteins, like <span className="text-white font-bold">Titin</span>, 
-                    can span tens of thousands of residues and play critical structural roles in the cell.
+                    Protein records sorted by length, longest first (top 20).
                  </p>
               </div>
 
@@ -67,8 +71,6 @@ export default function ProteinFeaturesPage() {
                       <TableHead>Protein ID</TableHead>
                       <TableHead>Gene</TableHead>
                       <TableHead className="text-right">Length (aa)</TableHead>
-                      <TableHead>System</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -78,8 +80,6 @@ export default function ProteinFeaturesPage() {
                           <TableCell><div className="h-4 w-32 bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
                           <TableCell><div className="h-4 w-24 bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
                           <TableCell className="text-right"><div className="h-4 w-16 ml-auto bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
-                          <TableCell><div className="h-4 w-20 bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
-                          <TableCell className="text-right"><div className="h-4 w-8 ml-auto bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -90,8 +90,7 @@ export default function ProteinFeaturesPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                               <span className="font-bold text-slate-900 dark:text-zinc-100">{p.gene_name || 'Unnamed'}</span>
-                               <span className="text-[10px] font-mono text-slate-400">{p.gene_id}</span>
+                               <span className="font-bold text-slate-900 dark:text-zinc-100">{p.gene_name || 'not mapped'}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-bold text-slate-900 dark:text-zinc-100">
@@ -99,19 +98,6 @@ export default function ProteinFeaturesPage() {
                                 <Hash className="h-3 w-3 text-slate-400" />
                                 {formatNumber(p.length)}
                              </div>
-                          </TableCell>
-                          <TableCell>
-                             <Badge variant="outline" className={cn(
-                               "text-[10px] uppercase font-bold border-none",
-                               p.is_mitochondrial ? "bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                             )}>
-                                {p.is_mitochondrial ? 'Mitochondrial' : 'Nuclear'}
-                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                             <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-md transition-colors text-slate-400 hover:text-primary">
-                                <ExternalLink className="h-4 w-4" />
-                             </button>
                           </TableCell>
                         </TableRow>
                       ))
@@ -129,7 +115,7 @@ export default function ProteinFeaturesPage() {
                  <div className="space-y-2">
                     <h4 className="font-bold text-blue-900 dark:text-blue-100">Low Complexity Sequences</h4>
                     <p className="text-sm text-blue-700/80 dark:text-blue-300/80 leading-relaxed">
-                       Homopolymer tracts are continuous runs of a single amino acid. Large tracts can be associated with specific structural properties or disease states (e.g., Poly-Q expansions).
+                       Homopolymer tracts are continuous runs of a single amino acid. Shown: the 100 longest tracts of length 10 or more, sorted by length.
                     </p>
                  </div>
               </div>
@@ -140,8 +126,8 @@ export default function ProteinFeaturesPage() {
                     <TableRow>
                       <TableHead>Residue</TableHead>
                       <TableHead className="text-right">Length</TableHead>
-                      <TableHead className="text-right">Position</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Protein</TableHead>
+                      <TableHead className="text-right">Position (residues)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -155,7 +141,7 @@ export default function ProteinFeaturesPage() {
                         </TableRow>
                       ))
                     ) : (
-                      tracts?.map((t, i) => (
+                      topTracts.map((t, i) => (
                         <TableRow key={i} className="group hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors">
                           <TableCell>
                              <div className="flex items-center gap-3">
@@ -168,13 +154,9 @@ export default function ProteinFeaturesPage() {
                           <TableCell className="text-right font-bold text-slate-900 dark:text-zinc-100">
                              {t.length} residues
                           </TableCell>
+                          <TableCell className="text-xs font-mono text-slate-500">{t.protein_id}</TableCell>
                           <TableCell className="text-right text-xs font-mono text-slate-500">
                              {formatNumber(t.start)} - {formatNumber(t.end)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                             <button className="p-1.5 hover:bg-slate-200 dark:hover:bg-zinc-800 rounded-md transition-colors text-slate-400 hover:text-primary">
-                                <ExternalLink className="h-4 w-4" />
-                             </button>
                           </TableCell>
                         </TableRow>
                       ))

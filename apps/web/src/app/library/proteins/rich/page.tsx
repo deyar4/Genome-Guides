@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { SectionHeader } from '@/components/library/dna/shared';
-import { formatNumber, cn } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 import { Activity, Target } from 'lucide-react';
 import { 
   Select, 
@@ -119,7 +119,7 @@ export default function RichProteinsPage() {
         <section>
           <SectionHeader 
             title={`${getAAName(selectedAA)} (${selectedAA})-Rich Proteins`}
-            subtitle={`Proteins where more than ${threshold[0]}% of the sequence is composed of ${getAAName(selectedAA)}.`}
+            subtitle={`Up to 50 proteins whose most frequent residue is ${getAAName(selectedAA)} at ${threshold[0]}% of the sequence or more, sorted by that percentage (highest first).`}
             badge={`${richProteins?.length || 0} Found`}
           />
           <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm mt-6">
@@ -127,10 +127,10 @@ export default function RichProteinsPage() {
               <TableHeader className="bg-slate-50 dark:bg-zinc-900/50">
                 <TableRow>
                   <TableHead className="w-[100px]">Protein ID</TableHead>
-                  <TableHead>Gene Identity</TableHead>
+                  <TableHead>Gene</TableHead>
                   <TableHead className="text-right">Length (AA)</TableHead>
-                  <TableHead className="text-right">Compartment</TableHead>
-                  <TableHead className="text-right">{selectedAA} Count</TableHead>
+                  <TableHead className="text-right">Distinct residues</TableHead>
+                  <TableHead className="text-right">{selectedAA} share (count)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -152,9 +152,10 @@ export default function RichProteinsPage() {
                   </TableRow>
                 ) : (
                   richProteins?.map((protein) => {
-                     // Calculate the count based on the sequence
-                     const count = (protein.sequence.match(new RegExp(selectedAA, 'g')) || []).length;
-                     const percentage = ((count / protein.length) * 100).toFixed(1);
+                     // The API sends the dominant residue's percentage; the sequence field is empty.
+                     const pct = protein.dominant_frequency_pct ?? 0;
+                     const count = Math.round((pct / 100) * protein.length);
+                     const percentage = pct.toFixed(1);
 
                      return (
                         <TableRow key={protein.protein_id} className="group hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors">
@@ -163,22 +164,14 @@ export default function RichProteinsPage() {
                            </TableCell>
                            <TableCell>
                               <div className="flex flex-col">
-                                 <span className="font-bold text-slate-900 dark:text-zinc-100">{protein.gene_name || protein.gene_id}</span>
-                                 <span className="text-[10px] font-mono text-slate-400">{protein.transcript_id}</span>
+                                 <span className="font-bold text-slate-900 dark:text-zinc-100">{protein.gene_name || 'not mapped'}</span>
                               </div>
                            </TableCell>
                            <TableCell className="text-right font-mono text-xs font-bold text-slate-600 dark:text-slate-400">
                               {formatNumber(protein.length)}
                            </TableCell>
                            <TableCell className="text-right">
-                              <Badge variant="outline" className={cn(
-                                 "text-[9px] uppercase font-bold tracking-tight px-1.5 py-0 border-none",
-                                 protein.is_mitochondrial 
-                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" 
-                                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                              )}>
-                                 {protein.is_mitochondrial ? 'Mitochondrial' : 'Nuclear'}
-                              </Badge>
+                              {protein.distinct_amino_acids ?? 'n/a'}
                            </TableCell>
                            <TableCell className="text-right">
                               <div className="flex flex-col items-end">

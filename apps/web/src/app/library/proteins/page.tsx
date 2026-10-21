@@ -48,28 +48,28 @@ export default function ProteinsOverview() {
           <GenomicMetricCard 
             label="Total Proteins"
             value={stats?.total_proteins ? formatNumber(stats.total_proteins) : '...'}
-            description="Total number of annotated protein-coding transcripts. This represents the diversity of the primary proteome before post-translational modifications."
+            description="Number of annotated protein records (isoforms of the same gene are counted separately)."
             color="#3b82f6"
           />
           <GenomicMetricCard 
             label="Avg Length"
             value={stats?.avg_length ? stats.avg_length.toFixed(0) : '...'}
             unit="aa"
-            description="The arithmetic mean of protein sequence lengths. Most human proteins fall within a range suitable for stable folding into three-dimensional domains."
+            description="Arithmetic mean of protein sequence lengths over all protein records."
             color="#10b981"
           />
           <GenomicMetricCard 
             label="Median Length"
             value={stats?.median_length ? stats.median_length.toFixed(0) : '...'}
             unit="aa"
-            description="The 50th percentile of protein size. This value is typically more representative of 'typical' proteins as it is less influenced by massive outliers."
+            description="The 50th percentile of protein length (less affected by very long outliers than the mean)."
             color="#f59e0b"
           />
           <GenomicMetricCard 
             label="Largest Protein"
             value={stats?.max_length ? formatNumber(stats.max_length) : '...'}
             unit="aa"
-            description="The longest polypeptide chain found in the proteome. In humans, this is Titin, which provides elastic support in muscle sarcomeres."
+            description="Length of the longest protein record in the annotation. See Protein Features for its identifier."
             color="#ef4444"
           />
         </div>
@@ -131,20 +131,20 @@ export default function ProteinsOverview() {
                  <div className="relative z-10">
                     <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-4">Biological Insight</h4>
                     <p className="text-sm text-slate-300 leading-relaxed mb-6">
-                       The human proteome is characterized by high levels of Leucine (L) and Serine (S), reflecting the chemical constraints of protein folding and cellular function.
+                       The most frequent residues in the chart are listed first (sorted by percentage).
                     </p>
                     <ul className="space-y-3">
                        <li className="flex items-start gap-3 text-xs text-slate-400">
                           <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
-                          Average protein is ~515 aa
+                          Mean length {stats ? Math.round(stats.avg_length).toLocaleString() : '...'} aa, median {stats ? Math.round(stats.median_length).toLocaleString() : '...'} aa
                        </li>
                        <li className="flex items-start gap-3 text-xs text-slate-400">
                           <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5" />
-                          Titin is the outlier at 34,350 aa
+                          Longest record: {stats ? stats.max_length.toLocaleString() : '...'} aa
                        </li>
                        <li className="flex items-start gap-3 text-xs text-slate-400">
                           <div className="h-1.5 w-1.5 rounded-full bg-blue-400 mt-1.5" />
-                          MT proteins use a distinct code
+                          Top residue: {compositionData[0] ? `${compositionData[0].aa} (${compositionData[0].percentage.toFixed(1)}%)` : '...'}
                        </li>
                     </ul>
                  </div>
