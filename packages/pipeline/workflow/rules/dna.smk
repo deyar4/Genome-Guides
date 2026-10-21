@@ -13,6 +13,8 @@ rule compute_cpg_islands:
         tsv=temp("data/interim/{genome}/cpg_islands.tsv")
     log:
         "logs/{genome}/compute_cpg_islands.log"
+    benchmark:
+        "benchmarks/{genome}/compute_cpg_islands.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -51,6 +53,8 @@ rule compute_ssrs:
         chunk_bases=config["tracks"]["ssr"]["chunk_bases"]
     log:
         "logs/{genome}/compute_ssrs.log"
+    benchmark:
+        "benchmarks/{genome}/compute_ssrs.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -69,6 +73,8 @@ rule compute_isochores:
         parquet="data/tracks/{genome}/all/isochores.parquet"
     log:
         "logs/{genome}/compute_isochores.log"
+    benchmark:
+        "benchmarks/{genome}/compute_isochores.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -87,6 +93,8 @@ rule compute_kmers_3mer:
         tsv=temp("data/tracks/{genome}/all/kmers_3mer.tsv")
     log:
         "logs/{genome}/compute_kmers_3mer.log"
+    benchmark:
+        "benchmarks/{genome}/compute_kmers_3mer.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -106,6 +114,8 @@ rule compute_kmers_6mer:
         tsv=temp("data/tracks/{genome}/all/kmers_6mer.tsv")
     log:
         "logs/{genome}/compute_kmers_6mer.log"
+    benchmark:
+        "benchmarks/{genome}/compute_kmers_6mer.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -130,6 +140,8 @@ rule compute_shannon_entropy:
         tsv=temp("data/interim/{genome}/entropy.tsv")
     log:
         "logs/{genome}/compute_shannon_entropy.log"
+    benchmark:
+        "benchmarks/{genome}/compute_shannon_entropy.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -168,6 +180,8 @@ rule compute_dinucleotides:
         tsv=temp("data/interim/{genome}/dinucleotides.tsv")
     log:
         "logs/{genome}/compute_dinucleotides.log"
+    benchmark:
+        "benchmarks/{genome}/compute_dinucleotides.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -186,6 +200,8 @@ rule compute_genomic_homopolymers:
         bed=temp("data/interim/{genome}/homopolymers.bed")
     log:
         "logs/{genome}/compute_genomic_homopolymers.log"
+    benchmark:
+        "benchmarks/{genome}/compute_genomic_homopolymers.tsv"
     threads: config["resources"]["analytical"]["threads"]
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -208,6 +224,8 @@ rule convert_homopolymers_to_parquet:
         parquet="data/tracks/{genome}/all/homopolymer_genomic_tracts.parquet"
     log:
         "logs/{genome}/convert_homopolymers_to_parquet.log"
+    benchmark:
+        "benchmarks/{genome}/convert_homopolymers_to_parquet.tsv"
     threads: 1
     resources:
         mem_mb=config["resources"]["analytical"]["mem_mb"]
@@ -230,6 +248,8 @@ rule compute_hecate_mprob:
         mprob=temp("data/interim/{genome}/mprob.xz")
     log:
         "logs/{genome}/compute_hecate_mprob.log"
+    benchmark:
+        "benchmarks/{genome}/compute_hecate_mprob.tsv"
     threads: config["resources"]["hecate"]["threads"]
     resources:
         mem_mb=config["resources"]["hecate"]["mem_mb"]
@@ -239,6 +259,8 @@ rule compute_hecate_mprob:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
+        # hecate uses rayon, which takes all cores unless capped (no thread flag in its CLI).
+        export RAYON_NUM_THREADS={threads}
         packages/hecate/target/release/hecate --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
             -f {input.fai} -i {output.mprob} \
