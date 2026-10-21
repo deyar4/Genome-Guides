@@ -158,6 +158,7 @@ def extract(gtf, fasta, out_dir):
             else:
                 con.execute("INSERT INTO exons VALUES (?, ?, ?, ?, ?, ?)",
                             (tx, start0, end0, chrom, strand, gene))
+    con.execute("CREATE INDEX exons_tx ON exons (tx)")
     con.commit()
 
     fa = FastaIndex(fasta)

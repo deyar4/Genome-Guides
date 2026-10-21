@@ -149,6 +149,7 @@ def parse(gtf, out_dir):
                     "ON CONFLICT(tx) DO UPDATE SET bases = bases + excluded.bases",
                     (tx, end0 - start0),
                 )
+    con.executescript("CREATE INDEX exons_tx ON exons (tx); CREATE INDEX utrs_tx ON utrs (tx);")
     con.commit()
 
     introns = []
