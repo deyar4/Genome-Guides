@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Calculate intergenic distances and overlapping gene pairs.
+"""Calculate intergenic gaps and overlaps relative to the covered span (D39, resolves Q-gene-spacing).
 
-Definition: genes on a contig are sorted by (start, gene_id) and each is paired with the NEXT gene by start. Half-open
-intervals: next.start >= end -> spacing next.start - end (0 when adjacent); next.start < end -> overlap of end - next.start.
-LIMITATION (audit review): the comparison uses the preceding gene's own end, not the running maximum end. For a gene nested
-inside a longer one, overlap_len can exceed the nested gene's length and the following gap is measured from the nested gene.
-This is "adjacent by start", not "distance to the covered span"; decide before using it for spacing statistics (OPEN_QUESTIONS).
+Definition. Per contig, genes are sorted by (start, gene_id); intervals are half-open [start, end). For gene i let
+M_i = max(end_j) over the genes j before i in that order, and g_i = the gene attaining M_i (ties: largest gene_id).
+The first gene of a contig has no M and produces no row (count: genes - gap rows - overlap rows).
+- start_i >= M_i: gene i lies right of everything before it. gene_spacing row (gene1 = g_i, gene2 = i),
+  intergenic_dist = start_i - M_i (0 when abutting). These gaps are the complement of the union of all gene intervals.
+- start_i <  M_i: gene i overlaps the covered span. gene_overlaps row (gene1 = g_i, gene2 = i),
+  overlap_len = min(end_i, M_i) - start_i (intersection with g_i, since start_i >= start of g_i), contained = (end_i <= M_i),
+  same_strand = strand of g_i equals strand of i. Only the max-end gene is paired; other overlapping genes get no row.
+Replaces "adjacent by start" (next gene by start, gap from the preceding gene's own end), which mismeasured nested genes.
 """
 
 import argparse
@@ -46,33 +50,42 @@ def process_spacing(input_parquet: str, out_dir: str):
 
     safe_input = input_parquet.replace("'", "''")
     source = f"read_parquet('{safe_input}')"
+    # struct ordering is (end_pos, gene_id): max end first, then the largest gene_id, so the result is order-independent
     pairs = f"""
         WITH ordered AS (
             SELECT contig, start_pos, end_pos, gene_id, strand,
-                LEAD(start_pos) OVER (PARTITION BY contig ORDER BY start_pos, gene_id) AS next_start_pos,
-                LEAD(gene_id) OVER (PARTITION BY contig ORDER BY start_pos, gene_id) AS next_gene_id,
-                LEAD(strand) OVER (PARTITION BY contig ORDER BY start_pos, gene_id) AS next_strand
+                MAX({{'e': end_pos, 'g': gene_id, 's': strand}}) OVER (
+                    PARTITION BY contig ORDER BY start_pos, gene_id
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev
             FROM {source}
+        ),
+        cover AS (
+            SELECT contig, start_pos, end_pos, gene_id, strand,
+                prev.e AS cover_end, prev.g AS cover_gene, prev.s AS cover_strand
+            FROM ordered
         )
     """
     try:
         con.execute(f"""
             COPY (
                 {pairs}
-                SELECT contig, gene_id AS gene1_id, next_gene_id AS gene2_id,
-                    CAST(next_start_pos - end_pos AS UINTEGER) AS intergenic_dist
-                FROM ordered
-                WHERE next_start_pos IS NOT NULL AND next_start_pos >= end_pos
+                SELECT contig, cover_gene AS gene1_id, gene_id AS gene2_id,
+                    CAST(start_pos - cover_end AS UINTEGER) AS intergenic_dist
+                FROM cover
+                WHERE cover_end IS NOT NULL AND start_pos >= cover_end
+                ORDER BY contig, start_pos, gene_id
             ) TO ? (FORMAT PARQUET, COMPRESSION ZSTD)
         """, [str(out_p / "gene_spacing.parquet")])
         con.execute(f"""
             COPY (
                 {pairs}
-                SELECT contig, gene_id AS gene1_id, next_gene_id AS gene2_id,
-                    CAST(end_pos - next_start_pos AS UINTEGER) AS overlap_len,
-                    CAST(strand = next_strand AS UTINYINT) AS same_strand
-                FROM ordered
-                WHERE next_start_pos IS NOT NULL AND next_start_pos < end_pos
+                SELECT contig, cover_gene AS gene1_id, gene_id AS gene2_id,
+                    CAST(LEAST(end_pos, cover_end) - start_pos AS UINTEGER) AS overlap_len,
+                    CAST(strand = cover_strand AS UTINYINT) AS same_strand,
+                    CAST(end_pos <= cover_end AS UTINYINT) AS contained
+                FROM cover
+                WHERE cover_end IS NOT NULL AND start_pos < cover_end
+                ORDER BY contig, start_pos, gene_id
             ) TO ? (FORMAT PARQUET, COMPRESSION ZSTD)
         """, [str(out_p / "gene_overlaps.parquet")])
     except duckdb.Error as exc:

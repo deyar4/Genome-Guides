@@ -293,7 +293,8 @@ def get_overlaps(
     params = [chrom] if chrom else []
     return track_service.execute_query(f"""
         SELECT contig AS chrom, gene1_id AS gene_id_1, gene2_id AS gene_id_2,
-               CASE WHEN same_strand = 1 THEN 'same_strand' ELSE 'opposite_strand' END AS overlap_type
+               CASE WHEN same_strand = 1 THEN 'same_strand' ELSE 'opposite_strand' END AS overlap_type,
+               overlap_len, contained = 1 AS contained
         FROM read_parquet('{path}')
         {where}
         ORDER BY gene_id_1, gene_id_2
