@@ -9,6 +9,7 @@ class TrackDataResponse(BaseModel):
     end: int
     max_points: int
     data: List[Any]
+    truncated: bool = False  # interval tracks: True when the row limit cut the result
 
 class SummaryResponse(BaseModel):
     genome: str

@@ -165,19 +165,17 @@ export function useGenomeData(selectedGenome: string, selectedContig: string, st
           fetchTrack("repeatmasker_families")
         ]);
 
+        // Track column is the cross-entropy rate `mean_entropy` (bits/base); NULL stays null (no `?? 0`, audit 05 P1/P2)
         const mappedHecateRes = hecateRes ? hecateRes.map((d: {
           bin_start: number;
-          avg_mean_prob?: number;
-          mean_prob?: number;
-          avg_min_prob?: number;
-          min_prob?: number;
-          avg_max_prob?: number;
-          max_prob?: number;
+          avg_mean_entropy: number | null;
+          min_mean_entropy: number | null;
+          max_mean_entropy: number | null;
         }) => ({
           bin_start: d.bin_start,
-          mean_prob: d.avg_mean_prob ?? d.mean_prob ?? 0,
-          min_prob: d.avg_min_prob ?? d.min_prob ?? 0,
-          max_prob: d.avg_max_prob ?? d.max_prob ?? 0
+          mean_entropy: d.avg_mean_entropy ?? null,
+          min_entropy: d.min_mean_entropy ?? null,
+          max_entropy: d.max_mean_entropy ?? null
         })) : null;
 
         setIsServerLive(true);

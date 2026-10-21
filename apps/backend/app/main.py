@@ -15,7 +15,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,  # no cookies or auth are used; "*" with credentials is invalid (audit 05, P10)
         allow_methods=["*"],
         allow_headers=["*"],
     )
