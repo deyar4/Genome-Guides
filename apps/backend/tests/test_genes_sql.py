@@ -20,6 +20,8 @@ def client(tmp_path_factory):
         ('G2', 'O''BRIEN', 'lncRNA', 'c1', 500, 900, '-')
     ) t(gene_id, gene_name, biotype, contig, start_pos, end_pos, strand)""")
     con.execute(f"COPY g TO '{out}/gene_models.parquet' (FORMAT PARQUET)")
+    con.execute(f"""COPY (SELECT 'c1' AS contig, 'G1' AS gene1_id, 'G2' AS gene2_id, CAST(300 AS UINTEGER) AS intergenic_dist)
+        TO '{out}/gene_spacing.parquet' (FORMAT PARQUET)""")
     service = DuckDBTrackService(data_dir=str(root))
     app.dependency_overrides[get_track_service] = lambda: service
     yield TestClient(app, raise_server_exceptions=False)
@@ -53,3 +55,10 @@ def test_gene_lookup(client):
     assert r.status_code == 200 and r.json()["gene_id"] == "G1"
     r = client.get("/api/v1/genes/x' OR '1'='1", params={"build": "synth"})
     assert r.status_code in (404, 422)
+
+
+def test_spacing_reports_the_gap_interval(client):
+    # G1 ends at 200, G2 starts at 500: the gap is [200, 500), length 300
+    r = client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c1"})
+    assert r.json() == [{"chrom": "c1", "gene_id_1": "G1", "gene_id_2": "G2", "start": 200, "end": 500, "distance": 300}]
+    assert client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c2"}).json() == []

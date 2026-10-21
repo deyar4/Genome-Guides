@@ -270,14 +270,19 @@ def get_spacing(
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = _track_path(track_service, build, "gene_spacing.parquet")
-    where = "WHERE contig = ?" if chrom else ""
+    models = _track_path(track_service, build, "gene_models.parquet")
+    where = "WHERE s.contig = ?" if chrom else ""
     params = [chrom] if chrom else []
+    # The gap is [end of the covering gene, start of gene 2) (half-open, 0-based);
+    # the parquet keeps only its length, so the start of gene 2 (unique gene_id) gives both ends.
     return track_service.execute_query(f"""
-        SELECT contig AS chrom, gene1_id AS gene_id_1, gene2_id AS gene_id_2,
-               0 AS start, 0 AS end, intergenic_dist AS distance
-        FROM read_parquet('{path}')
+        SELECT s.contig AS chrom, s.gene1_id AS gene_id_1, s.gene2_id AS gene_id_2,
+               CAST(m.start_pos AS BIGINT) - s.intergenic_dist AS start,
+               CAST(m.start_pos AS BIGINT) AS end, s.intergenic_dist AS distance
+        FROM read_parquet('{path}') s
+        JOIN read_parquet('{models}') m ON m.gene_id = s.gene2_id
         {where}
-        ORDER BY intergenic_dist DESC
+        ORDER BY s.intergenic_dist DESC
         LIMIT 1000
     """, params)
 

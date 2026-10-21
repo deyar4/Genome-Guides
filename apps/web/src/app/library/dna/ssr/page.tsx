@@ -109,15 +109,15 @@ export default function SSRAnalysisPage() {
         {/* HERO STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
            <GenomicMetricCard 
-             label="Total SSR Hubs"
+             label="SSR Tracts"
              value={totalCount ? formatNumber(totalCount) : '...'}
-             description="Total polymorphic repeat clusters identified across the selected assembly region."
+             description="Number of tandem repeat tracts detected on the selected chromosome."
              color="#3b82f6"
            />
            <GenomicMetricCard 
-             label="Covered Sequence"
+             label="Summed Tract Length"
              value={totalLength ? formatBp(totalLength) : '...'}
-             description="Total genomic footprint occupied by simple sequence repeats."
+             description="Sum of tract lengths in bp. Tracts of different periods may overlap, so this can exceed the number of bases covered."
              color="#10b981"
            />
            <GenomicMetricCard 
@@ -268,8 +268,8 @@ export default function SSRAnalysisPage() {
         {/* LEADBOARD TABLE */}
         <section>
            <SectionHeader 
-             title="Top Polymorphic Sites" 
-             subtitle="Longest and most complex repeats identified in the selected chromosome."
+             title="First Tracts" 
+             subtitle="The first 100 tracts of the selected chromosome by start position (0-based), not ranked by length or complexity."
              badge="Dataset View"
            />
            <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm mt-6">
