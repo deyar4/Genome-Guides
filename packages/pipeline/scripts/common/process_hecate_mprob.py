@@ -88,6 +88,7 @@ def process_mprob(
         raise SystemExit(f"Error: Cannot read Hecate probability stream '{xz_path}': {exc}") from exc
 
     masks = load_masks(nonacgt_bed)
+    stats = {"bases": 0, "masked": 0, "prob_zero": 0}
     pad_idx = stream_pad_indices(contigs)
     stream_pos = 0
     contig_idx = 0
@@ -151,6 +152,9 @@ def process_mprob(
 
                 p_part = mask_nonacgt(probs[chunk_pos:chunk_pos + take], masks, current_contig, pos_in_contig)
                 e_part = mask_nonacgt(entropies[chunk_pos:chunk_pos + take], masks, current_contig, pos_in_contig)
+                stats["bases"] += len(p_part)
+                stats["masked"] += int(np.isnan(p_part).sum())
+                stats["prob_zero"] += int((p_part == 0).sum())
                 p_slice = np.concatenate((pending_p, p_part))
                 e_slice = np.concatenate((pending_e, e_part))
                 window_start = pos_in_contig - len(pending_p)
@@ -214,6 +218,14 @@ def process_mprob(
         raise ValueError(
             f"Probability stream ended early: {contig_idx} of {len(contigs)} contigs complete"
         )
+    valid = stats["bases"] - stats["masked"]
+    print(
+        f"hecate probabilities: bases={stats['bases']} masked_nonacgt={stats['masked']} valid={valid} "
+        f"prob_zero={stats['prob_zero']} (printed 0.00000, i.e. p < 5e-6; surprisal clipped to 20 bits) "
+        f"fraction_zero={stats['prob_zero'] / max(valid, 1):.3e}",
+        file=sys.stderr,
+    )
+    return stats
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

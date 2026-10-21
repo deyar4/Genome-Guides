@@ -59,7 +59,8 @@ def test_nonacgt_mask_gives_nan_and_counts(tmp_path):
     # c1: window [0,100) half masked, window [100,200) fully masked; c4 (4 bp) fully masked
     (tmp_path / "m.bed").write_text("c1\t50\t200\nc4\t0\t4\n")
     out = tmp_path / "o.parquet"
-    process_mprob(fai, tmp_path / "p.txt", out, window_size=100, chunk_windows=3, nonacgt_bed=tmp_path / "m.bed")
+    stats = process_mprob(fai, tmp_path / "p.txt", out, window_size=100, chunk_windows=3, nonacgt_bed=tmp_path / "m.bed")
+    assert stats == {"bases": 2282, "masked": 154, "prob_zero": 0}
     df = pl.read_parquet(out)
     c1 = df.filter(pl.col("contig") == "c1").sort("start_pos")
     assert c1["n_valid"].to_list()[:3] == [50, 0, 100]
@@ -70,6 +71,22 @@ def test_nonacgt_mask_gives_nan_and_counts(tmp_path):
     assert c4["n_valid"].to_list() == [0]
     c2 = df.filter(pl.col("contig") == "c2")
     assert c2["n_valid"].to_list() == [100] * 5
+
+
+def test_zero_probabilities_are_counted_and_clipped(tmp_path):
+    fai = tmp_path / "x.fai"
+    write_fai(fai)
+    stream = []
+    for _, n in CONTIGS:
+        stream += [0.25] * n + ([0.5] if n % 2 else [])
+    stream[10] = 0.0
+    stream[20] = 0.0
+    (tmp_path / "p.txt").write_text("\n".join(f"{x:.5f}" for x in stream) + "\n")
+    out = tmp_path / "o.parquet"
+    stats = process_mprob(fai, tmp_path / "p.txt", out, window_size=100)
+    assert stats["prob_zero"] == 2
+    first = pl.read_parquet(out).sort(["contig", "start_pos"])["mean_entropy"][0]
+    assert np.isclose(first, (98 * 2.0 + 2 * 20.0) / 100, atol=1e-4)
 
 
 def test_short_stream_raises(tmp_path):
