@@ -235,11 +235,12 @@ rule build_hecate:
     params:
         repo=config["tracks"]["hecate_bwt"]["repo"],
         commit=config["tracks"]["hecate_bwt"]["commit"],
-        subdir=config["tracks"]["hecate_bwt"].get("subdir", ".")
+        subdir=config["tracks"]["hecate_bwt"].get("subdir", "."),
+        patches=" ".join(config["tracks"]["hecate_bwt"].get("patches", []))
     shell:
         """
         exec > {log} 2>&1
-        packages/pipeline/scripts/common/build_hecate.sh {params.repo} {params.commit} {output.binary} {params.subdir}
+        packages/pipeline/scripts/common/build_hecate.sh {params.repo} {params.commit} {output.binary} {params.subdir} {params.patches}
         """
 
 rule check_hecate:

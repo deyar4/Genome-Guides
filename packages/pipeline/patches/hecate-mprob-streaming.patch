@@ -1,0 +1,114 @@
+diff --git a/src/cmd/encode.rs b/src/cmd/encode.rs
+index dfedd85..f95c29f 100644
+--- a/src/cmd/encode.rs
++++ b/src/cmd/encode.rs
+@@ -32,6 +32,7 @@ use hecate::stream::pipe::PipeInput;
+ use hecate::stream::traits::{BorrowRead, StreamRead, StreamWrite};
+ use std::io::{self, BufWriter, Write};
+ use std::path::Path;
++use std::sync::atomic::{AtomicBool, Ordering};
+ use std::sync::{Arc, Mutex};
+ use std::time::Instant;
+ 
+@@ -232,6 +233,17 @@ pub fn cmd_encode(cli: &Cli) -> io::Result<()> {
+         index_tier,
+         initial_offset,
+     );
++    // Drain the probabilities from a writer thread while encoding runs, so the sink never holds
++    // more than a short backlog (the full genome would otherwise need ~4 bytes per base in RAM).
++    let mprob_done = Arc::new(AtomicBool::new(false));
++    let mut mprob_writer = None;
++    if let (Some(sink), Some(path)) = (mprob_sink.clone(), cli.mprob.clone()) {
++        let done = mprob_done.clone();
++        let force = cli.force;
++        mprob_writer = Some(std::thread::spawn(move || {
++            write_mprob_file(&sink, &path, force, &done)
++        }));
++    }
+     if mprob_sink.is_some() {
+         // Probabilities must be captured in stream order -> no parallel blocks.
+         mux.force_sequential();
+@@ -261,8 +273,11 @@ pub fn cmd_encode(cli: &Cli) -> io::Result<()> {
+     .write_to(&mut *output)?;
+     output.flush()?;
+ 
+-    if let (Some(sink), Some(path)) = (mprob_sink, cli.mprob.as_ref()) {
+-        write_mprob_file(&sink, path, cli.force)?;
++    mprob_done.store(true, Ordering::SeqCst);
++    if let Some(handle) = mprob_writer {
++        handle
++            .join()
++            .map_err(|_| io::Error::new(io::ErrorKind::Other, "mprob writer thread panicked"))??;
+     }
+ 
+     if cli.verbose {
+@@ -279,9 +294,15 @@ pub fn cmd_encode(cli: &Cli) -> io::Result<()> {
+     Ok(())
+ }
+ 
+-/// Write the captured per-base probabilities to `path` as an xz stream of
+-/// newline-separated 5-decimal values.
+-fn write_mprob_file(sink: &ProbSink, path: &Path, force: bool) -> io::Result<()> {
++/// Write the per-base probabilities to `path` as an xz stream of newline-separated
++/// 5-decimal values. Probabilities are drained from `sink` as they arrive; once `done`
++/// is set and the sink is empty the stream is finished.
++fn write_mprob_file(
++    sink: &ProbSink,
++    path: &Path,
++    force: bool,
++    done: &AtomicBool,
++) -> io::Result<()> {
+     if path.exists() && !force {
+         return Err(io::Error::new(
+             io::ErrorKind::AlreadyExists,
+@@ -296,19 +317,32 @@ fn write_mprob_file(sink: &ProbSink, path: &Path, force: bool) -> io::Result<()>
+     let mut writer = BufWriter::new(file);
+ 
+     use std::fmt::Write as _;
+-    let probs = sink.lock().unwrap();
+     let mut text_buf = String::with_capacity(1024 * 1024);
+     let mut comp_out = Vec::with_capacity(1024 * 1024);
+ 
+-    for &q in probs.iter() {
+-        writeln!(text_buf, "{:.5}", q as f64 / 100_000.0)
+-            .expect("writing to a string buffer should not fail");
++    loop {
++        // Read the flag before draining: anything pushed before `done` was set is then
++        // guaranteed to be seen by this or the next drain.
++        let finished = done.load(Ordering::SeqCst);
++        let drained: Vec<u32> = std::mem::take(&mut *sink.lock().unwrap());
++
++        for &q in &drained {
++            writeln!(text_buf, "{:.5}", q as f64 / 100_000.0)
++                .expect("writing to a string buffer should not fail");
++
++            if text_buf.len() > 512 * 1024 {
++                compressor.compress(text_buf.as_bytes(), &mut comp_out)?;
++                writer.write_all(&comp_out)?;
++                text_buf.clear();
++                comp_out.clear();
++            }
++        }
+ 
+-        if text_buf.len() > 512 * 1024 {
+-            compressor.compress(text_buf.as_bytes(), &mut comp_out)?;
+-            writer.write_all(&comp_out)?;
+-            text_buf.clear();
+-            comp_out.clear();
++        if finished && drained.is_empty() {
++            break;
++        }
++        if drained.is_empty() {
++            std::thread::sleep(std::time::Duration::from_millis(50));
+         }
+     }
+ 
+@@ -337,7 +371,7 @@ mod tests {
+         let tmp = tempfile::tempdir().unwrap();
+         let path = tmp.path().join("probs.xz");
+ 
+-        write_mprob_file(&sink, &path, false).unwrap();
++        write_mprob_file(&sink, &path, false, &AtomicBool::new(true)).unwrap();
+ 
+         let compressed = std::fs::read(path).unwrap();
+         let mut raw = Vec::new();

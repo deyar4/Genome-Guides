@@ -41,21 +41,22 @@ tracks:
     kmer_length: 21
     window_size: 100
     chunk_windows: 1000
-    # Pinned hecate build (D32, D34). Temporary: the build source is this repository's own history, commit a097cf1
-    # (the vendored copy, which streams --mprob output). Upstream trunk 76b4836 holds all probabilities in RAM
-    # (about 12.5 GB for T2T) and ran out of memory. Switch repo/commit/subdir to upstream once it takes the
-    # streaming patch. The binary is not tracked in git; if absent the workflow builds it (needs git, Rust, a C
-    # compiler with OpenMP). The reported version is "1.0" for every commit, so commit and hash are the identity.
-    # The hash is always recorded in data/interim/hecate_binary.txt; a mismatch only warns (another toolchain can
-    # differ) unless strict_hash is true (reference machine, Docker image).
+    # Pinned hecate build (D32, D35): upstream trunk 76b4836 plus packages/pipeline/patches/hecate-mprob-streaming.patch.
+    # Without the patch, upstream keeps every --mprob probability in RAM (about 12.5 GB for T2T) and ran out of
+    # memory; the patch drains them from a writer thread. The binary is not tracked in git; if absent the workflow
+    # builds it (needs git, network, Rust, a C compiler with OpenMP). The reported version is "1.0" for every commit,
+    # so commit, patch and hash are the identity. The hash is always recorded in data/interim/hecate_binary.txt;
+    # a mismatch only warns (another toolchain can differ) unless strict_hash is true (reference machine, Docker).
     strict_hash: false
-    repo: "."
-    subdir: "packages/hecate"
-    commit: "a097cf1d08d70f917d2e52b5ab6a9149c4874ccd"
+    repo: "https://gitlab.com/rahmannlab/hecate.git"
+    subdir: "."
+    commit: "76b48360b52130b9e6149a1c90984d4ed74757f3"
+    patches:
+      - "packages/pipeline/patches/hecate-mprob-streaming.patch"
     binary: "tools/hecate/hecate"
     # sha256 of the binary per platform, from packages/pipeline/scripts/common/build_hecate.sh (path-independent).
     sha256:
-      linux-x86_64: "b2eed68c12dcdddfae4ef067dfd3b217b92d1cf289803b3acd34c8a2d2b6acfc"
+      linux-x86_64: "ca949a90d66f3471f0a72f24d0fdee1bfc5492a49219f7bd4ce7836618756209"
   ssr:
     enabled: true
     # 1 Mb bins support genome-wide enrichment comparisons without dense output.
