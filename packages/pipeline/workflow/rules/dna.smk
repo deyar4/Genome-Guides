@@ -242,5 +242,6 @@ rule compute_hecate_mprob:
         packages/hecate/target/release/hecate --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
             -f {input.fai} -i {output.mprob} \
-            -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows}
+            -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows} \
+            --symbols-per-base 2
         """

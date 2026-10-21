@@ -8,11 +8,20 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from resource_args import add_resource_args, effective_memory_mb
 
-def process_mprob(fai_path, xz_path, out_path, window_size=1000, chunk_windows=1000):
+def process_mprob(
+    fai_path,
+    xz_path,
+    out_path,
+    window_size=1000,
+    chunk_windows=1000,
+    symbols_per_base=2,
+):
     if window_size < 1:
         raise ValueError("window size must be at least 1")
     if chunk_windows < 1:
         raise ValueError("chunk windows must be at least 1")
+    if symbols_per_base < 1:
+        raise ValueError("symbols per base must be at least 1")
 
     contigs = []
     with open(fai_path, 'r') as f:
@@ -39,6 +48,7 @@ def process_mprob(fai_path, xz_path, out_path, window_size=1000, chunk_windows=1
     pos_in_contig = 0
     pending_p = np.empty(0, dtype=float)
     pending_e = np.empty(0, dtype=float)
+    pending_symbols = np.empty(0, dtype=float)
     
     arrow_schema = pa.schema([
         ("contig", pa.string()),
@@ -54,9 +64,23 @@ def process_mprob(fai_path, xz_path, out_path, window_size=1000, chunk_windows=1
 
     try:
         for chunk in chunk_iterator:
-            probs = chunk["prob"].to_numpy()
+            raw_probs = chunk["prob"].to_numpy()
+            if symbols_per_base > 1:
+                raw_probs = np.concatenate((pending_symbols, raw_probs))
+                complete_symbols = (
+                    len(raw_probs) // symbols_per_base
+                ) * symbols_per_base
+                pending_symbols = raw_probs[complete_symbols:]
+                if complete_symbols == 0:
+                    continue
+                probs = raw_probs[:complete_symbols].reshape(
+                    -1, symbols_per_base
+                ).prod(axis=1)
+            else:
+                probs = raw_probs
 
-            # Vectorized entropy keeps the per-batch calculation in NumPy.
+            # Four-bit Hecate packs each nucleotide into two modeled nibbles;
+            # their product is the joint per-base probability.
             with np.errstate(divide="ignore"):
                 entropies = -np.log2(probs)
             entropies = np.clip(entropies, 0, 20.0)
@@ -133,6 +157,12 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", required=True)
     parser.add_argument("-w", "--window", type=int, default=1000)
     parser.add_argument(
+        "--symbols-per-base",
+        type=int,
+        default=2,
+        help="Modeled Hecate symbols per nucleotide (default: 2 for four-bit mode)",
+    )
+    parser.add_argument(
         "--chunk-windows",
         type=int,
         default=1000,
@@ -141,4 +171,11 @@ if __name__ == "__main__":
     add_resource_args(parser)
     args = parser.parse_args()
     chunk_windows = min(args.chunk_windows, max(100, effective_memory_mb(args.memory_mb) // 4))
-    process_mprob(args.fai, args.input, args.output, args.window, chunk_windows)
+    process_mprob(
+        args.fai,
+        args.input,
+        args.output,
+        args.window,
+        chunk_windows,
+        args.symbols_per_base,
+    )
