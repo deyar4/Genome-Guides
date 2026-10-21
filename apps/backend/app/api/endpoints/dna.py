@@ -372,10 +372,25 @@ def get_ssr_summary(
     chrom: Optional[str] = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
-    path = _read_track(track_service, build, "ssr_summary.parquet")
+    """Per-period counts. Genome-wide from ssr_summary.parquet; with `chrom`, computed from the hits of that contig."""
+    if chrom is None:
+        path = _read_track(track_service, build, "ssr_summary.parquet")
+        if path is None:
+            return []
+        return track_service.execute_query(f"SELECT * FROM read_parquet('{path}') ORDER BY period")
+    path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
         return []
-    return track_service.execute_query(f"SELECT * FROM read_parquet('{path}') ORDER BY period")
+    return track_service.execute_query(
+        f"""SELECT CAST(period AS INTEGER) AS period, ANY_VALUE(period_name) AS name, COUNT(*) AS count,
+                   CAST(SUM(length) AS BIGINT) AS total_length,
+                   SUM(length) / (COUNT(*) * CAST(period AS DOUBLE)) AS avg_repeat_count
+            FROM read_parquet('{path}')
+            WHERE chrom = ?
+            GROUP BY period
+            ORDER BY period""",
+        [chrom],
+    )
 
 @router.get("/ssr/density", response_model=List[SSRDensityWindow])
 def get_ssr_density(
@@ -384,15 +399,20 @@ def get_ssr_density(
     window_size: int = Query(1000000, gt=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
-    path = _read_track(track_service, build, "ssr_density.parquet")
+    """Tracts per window of `window_size` bases, each tract counted in the window containing its start (0-based).
+    Computed from the hits, so any window works; "end" is start + window_size (not clipped to the contig length).
+    Windows without tracts are absent."""
+    path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
         return []
     return track_service.execute_query(
-        f"""SELECT chrom, "start", "end", count
+        f"""SELECT chrom, CAST("start" // ? * ? AS UBIGINT) AS "start", CAST("start" // ? * ? + ? AS UBIGINT) AS "end",
+                   COUNT(*) AS count
             FROM read_parquet('{path}')
             WHERE chrom = ?
-            ORDER BY "start" """,
-        [chrom],
+            GROUP BY chrom, 2, 3
+            ORDER BY 2""",
+        [window_size] * 5 + [chrom],
     )
 
 

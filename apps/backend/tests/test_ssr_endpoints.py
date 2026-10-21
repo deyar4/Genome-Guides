@@ -18,7 +18,6 @@ def client(tmp_path_factory):
         2 + (i//2)%2 AS period, 10 AS repeat_count, 'ACACACACACACACACACAC' AS sequence, 20 AS length,
         'x' AS period_name, 0.5 AS complexity FROM range(100) t(i) ORDER BY chrom, "start")
         TO '{out}/ssr_hits.parquet' (FORMAT PARQUET)""")
-    con.execute(f"""COPY (SELECT 'c1' AS chrom, 0 AS "start", 1000 AS "end", 3 AS count) TO '{out}/ssr_density.parquet' (FORMAT PARQUET)""")
     service = DuckDBTrackService(data_dir=str(root))
     app.dependency_overrides[get_track_service] = lambda: service
     yield TestClient(app, raise_server_exceptions=False)
@@ -59,7 +58,18 @@ def test_quote_in_chrom_is_not_sql(client):
     assert r.status_code in (200, 422) and not (r.status_code == 200 and r.json())
 
 
-def test_density_filters_chrom(client):
-    r = client.get("/api/v1/dna/ssr/density", params={"build": "synth", "chrom": "c1"})
-    assert r.status_code == 200 and r.json()[0]["count"] == 3
-    assert client.get("/api/v1/dna/ssr/density", params={"build": "synth", "chrom": "c2"}).json() == []
+def test_density_uses_requested_window_and_filters_chrom(client):
+    # c1 hits start at 0,100,...,4900 (50 hits)
+    r = client.get("/api/v1/dna/ssr/density", params={"build": "synth", "chrom": "c1", "window_size": 1000}).json()
+    assert [(x["start"], x["end"], x["count"]) for x in r] == [(i * 1000, i * 1000 + 1000, 10) for i in range(5)]
+    r = client.get("/api/v1/dna/ssr/density", params={"build": "synth", "chrom": "c1", "window_size": 2500}).json()
+    assert [(x["start"], x["count"]) for x in r] == [(0, 25), (2500, 25)]
+    assert client.get("/api/v1/dna/ssr/density", params={"build": "synth", "chrom": "nochr"}).json() == []
+
+
+def test_summary_per_chrom_from_hits(client):
+    rows = client.get("/api/v1/dna/ssr/summary", params={"build": "synth", "chrom": "c1"}).json()
+    by = {r["period"]: r for r in rows}
+    assert by[2]["count"] == 25 and by[3]["count"] == 25
+    assert by[2]["total_length"] == 25 * 20 and by[2]["avg_repeat_count"] == pytest.approx(10.0)
+    assert client.get("/api/v1/dna/ssr/summary", params={"build": "synth", "chrom": "nochr"}).json() == []
