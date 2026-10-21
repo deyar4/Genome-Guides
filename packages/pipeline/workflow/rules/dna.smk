@@ -224,10 +224,42 @@ rule convert_homopolymers_to_parquet:
             -s homopolymers
         """
 
+rule build_hecate:
+    output:
+        binary=config["tracks"]["hecate_bwt"]["binary"]
+    log:
+        "logs/build_hecate.log"
+    threads: 4
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
+    params:
+        repo=config["tracks"]["hecate_bwt"]["repo"],
+        commit=config["tracks"]["hecate_bwt"]["commit"]
+    shell:
+        """
+        exec > {log} 2>&1
+        packages/pipeline/scripts/common/build_hecate.sh {params.repo} {params.commit} {output.binary}
+        """
+
+rule check_hecate:
+    input:
+        binary=config["tracks"]["hecate_bwt"]["binary"]
+    output:
+        info="data/interim/hecate_binary.txt"
+    params:
+        commit=config["tracks"]["hecate_bwt"]["commit"],
+        expected=[f"{k}={v}" for k, v in config["tracks"]["hecate_bwt"]["sha256"].items()],
+        strict="--strict" if config["tracks"]["hecate_bwt"].get("strict_hash", False) else ""
+    run:
+        expected = " ".join(f"--expected {e}" for e in params.expected)
+        shell("python3 packages/pipeline/scripts/common/check_hecate.py --binary {input.binary} "
+              "--commit {params.commit} {expected} {params.strict} -o {output.info}")
+
 rule compute_hecate_mprob:
     input:
         fasta="data/raw/{genome}.fa",
-        fai="data/raw/{genome}.fa.fai"
+        fai="data/raw/{genome}.fa.fai",
+        hecate_info="data/interim/hecate_binary.txt"
     output:
         parquet="data/tracks/{genome}/all/hecate_mprob.parquet",
         he=temp("data/interim/{genome}/temp.he"),
@@ -239,13 +271,14 @@ rule compute_hecate_mprob:
     resources:
         mem_mb=config["resources"]["hecate"]["mem_mb"]
     params:
-        chunk_windows=config["tracks"]["hecate_bwt"]["chunk_windows"]
+        chunk_windows=config["tracks"]["hecate_bwt"]["chunk_windows"],
+        hecate=config["tracks"]["hecate_bwt"]["binary"]
     shell:
         """
         exec > {log} 2>&1
         mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
         seqkit locate -P -i -r -p "[^ACGT]+" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n | bedtools merge -i - > {output.nonacgt}
-        packages/hecate/target/release/hecate --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
+        {params.hecate} --force -e -M markov --mprob {output.mprob} {input.fasta} -o {output.he}
         python3 packages/pipeline/scripts/common/process_hecate_mprob.py \
             -f {input.fai} -i {output.mprob} \
             -o {output.parquet} -w 1000 --chunk-windows {params.chunk_windows} \
