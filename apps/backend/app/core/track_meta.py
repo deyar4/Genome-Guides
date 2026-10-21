@@ -43,7 +43,7 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
             "avg_mean_entropy": (
                 "Cross-entropy rate in bits per base under the hecate adaptive order-mixture model: mean of "
                 "-log2 P(x_i | preceding bases) over valid bases of the window, surprisal clipped at 20 bits, "
-                "weighted by n_valid. Forward, prequential: depends on sequence order (audit 03, A1). "
+                "weighted by n_valid. Forward, prequential: depends on sequence order, and the model context runs across contig boundaries (audit 03, A1, S6). "
                 "NOT Shannon entropy of composition."
             ),
             "avg_mean_prob": "Mean of P(x_i | context) per window (probability, 0..1), weighted by n_valid. Not a surprisal.",

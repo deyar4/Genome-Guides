@@ -9,12 +9,13 @@ import warnings
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from resource_args import add_resource_args, effective_memory_mb
 
-def expected_model_class(first_block_bytes):
-    """Model machine hecate picks for a stream, from its first block size (markov_codec.rs `dispatch`, upstream 76b4836:
-    < 200,000 -> vmarkov; < 3/4 * 1 MiB block budget -> bmarkov; else markov). Block size is in nucleotides."""
-    if first_block_bytes < 200_000:
+def expected_model_class(first_block_len):
+    """EXPECTED model machine from the first block length, using the dispatch in upstream 76b4836 (markov_codec.rs `dispatch`:
+    < 200,000 -> vmarkov; < 3/4 * 1 MiB block budget -> bmarkov; else markov). The unit and the exact first-block length
+    that hecate sees are not verified here (audit 03 S3): this is a log line for humans, not a measurement of the run."""
+    if first_block_len < 200_000:
         return "vmarkov"
-    if first_block_bytes < (1 << 20) * 3 // 4:
+    if first_block_len < (1 << 20) * 3 // 4:
         return "bmarkov"
     return "markov"
 

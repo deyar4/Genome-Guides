@@ -24,3 +24,9 @@ export function formatKb(bases: number): string {
 export function formatBp(bases: number): string {
   return new Intl.NumberFormat('en-US').format(bases);
 }
+
+
+/** The API only bins in whole multiples of the 1 kb base window (D31, D36): round a wanted bin size up to one. */
+export function alignToBaseWindow(bp: number, baseWindow = 1000): number {
+  return Math.max(baseWindow, Math.ceil(bp / baseWindow) * baseWindow);
+}

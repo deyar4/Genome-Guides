@@ -83,6 +83,10 @@ class DuckDBTrackService:
         with self._lock:
             return self._query_track_range(genome, contig, track_name, start_pos, end_pos, max_points)
 
+    def window_size(self, parquet_path: Path) -> int:
+        with self._lock:
+            return self._window_size(parquet_path)
+
     def _window_size(self, parquet_path: Path) -> int:
         """Largest window width in the file (the base resolution, D31). Bins are multiples of it so they stay exact."""
         key = str(parquet_path)

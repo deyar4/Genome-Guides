@@ -16,7 +16,7 @@ import {
 import { dnaApi } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Search, MapPin, Activity, Database, Copy, Check, FileText } from 'lucide-react';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, alignToBaseWindow } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export default function RegionInspectorPage() {
@@ -41,7 +41,7 @@ export default function RegionInspectorPage() {
     queryFn: () => dnaApi.getSequenceWindows(activeGenome, chrom, { 
       start: queryStart, 
       end: queryEnd, 
-      step: Math.max(100, Math.floor((queryEnd - queryStart) / 100)) 
+      step: alignToBaseWindow((queryEnd - queryStart) / 100) 
     }),
     enabled: false,
   });

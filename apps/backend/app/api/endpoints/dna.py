@@ -17,6 +17,13 @@ from app.schemas.dna import (
 router = APIRouter()
 
 
+def _require_window_multiple(track_service, path, size: int, what: str) -> None:
+    """Bins must be whole multiples of the base window so each is an exact aggregate (D36)."""
+    base = track_service.window_size(path)
+    if size % base:
+        raise HTTPException(status_code=422, detail=f"{what} must be a multiple of the base window ({base} bp)")
+
+
 def _opt(value):
     """NULL stays None (explicit missing), never 0."""
     return None if value is None else float(value)
@@ -226,12 +233,13 @@ def get_sequence(
 def get_gc_skew(
     chrom: str,
     build: str = Query(...),
-    window_size: int = Query(10000, gt=0),
+    window_size: int = Query(10000, gt=0, le=100_000_000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"GC content track not found for build '{build}'")
+    _require_window_multiple(track_service, path, window_size, "window_size")
     rows = track_service.execute_query(
         f"""SELECT CAST(FLOOR(start_pos / {window_size}) * {window_size} AS BIGINT) AS start,
                    {GC_SKEW_SQL} AS gc_skew
@@ -299,19 +307,22 @@ def get_cpg_islands(
 def get_kmers(
     chrom: str,
     build: str = Query(..., description="Genome build"),
-    k: int = Query(6, description="K-mer size (3 or 6)"),
-    top_n: int = Query(20, description="Top N kmers"),
-    start: Optional[int] = Query(0, description="Start pos"),
-    end: Optional[int] = Query(1000000, description="End pos"),
+    k: int = Query(6, ge=3, le=6, description="K-mer size (3 or 6)"),
+    top_n: int = Query(20, ge=1, le=4096, description="Top N kmers"),
+    start: Optional[int] = Query(None, description="Ignored: k-mer counts are genome-wide (kept for client compatibility)"),
+    end: Optional[int] = Query(None, description="Ignored: k-mer counts are genome-wide (kept for client compatibility)"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    if k not in (3, 6):
+        raise HTTPException(status_code=422, detail="k must be 3 or 6")
     try:
         path = track_service.data_dir / "tracks" / build / "all" / f"kmers_{k}mer.parquet"
+        totals = track_service.execute_query(f"SELECT SUM(count) AS total, COUNT(*) AS n FROM read_parquet('{path}')")[0]
         res = track_service.execute_query(f"SELECT kmer, count, frequency_pct as frequency FROM read_parquet('{path}') ORDER BY count DESC LIMIT {top_n}")
         kmers = []
         for r in res:
             kmers.append(KmerFrequency(kmer=r.get("kmer",""), count=int(r.get("count",0)), frequency=float(r.get("frequency",0))))
-        return KmerResponse(k=k, total_kmers=sum([x.count for x in kmers]), unique_kmers=len(kmers), kmers=kmers)
+        return KmerResponse(k=k, total_kmers=int(totals['total'] or 0), unique_kmers=int(totals['n'] or 0), kmers=kmers)
     except duckdb.IOException:
         raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
@@ -419,13 +430,14 @@ def get_sequence_window(
     chrom: str = Query(...),
     start: int = Query(0, ge=0),
     end: Optional[int] = Query(None, gt=0),
-    step: int = Query(10000, gt=0),
+    step: int = Query(10000, gt=0, le=100_000_000),
     limit: int = Query(1000, gt=0, le=5000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"GC content track not found for build '{build}'")
+    _require_window_multiple(track_service, path, step, "step")
     upper = end if end is not None else start + step * limit
     rows = track_service.execute_query(
         f"""SELECT CAST(FLOOR(start_pos / {step}) * {step} AS BIGINT) AS start,

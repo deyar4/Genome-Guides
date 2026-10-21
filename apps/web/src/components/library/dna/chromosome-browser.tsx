@@ -23,7 +23,7 @@ import {
   Brush
 } from 'recharts';
 import { useChartTheme } from '@/hooks/use-chart-theme';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, alignToBaseWindow } from '@/lib/utils';
 import { Loader2, MoveHorizontal, Info } from 'lucide-react';
 
 interface ChromosomeBrowserProps {
@@ -42,7 +42,7 @@ export function ChromosomeBrowser({ chromosomes, initialChrom }: ChromosomeBrows
   const { data: windows, isLoading: windowsLoading } = useQuery({
     queryKey: ['gc-windows', activeGenome, selectedChrom],
     queryFn: () => dnaApi.getSequenceWindows(activeGenome, selectedChrom, { 
-      step: Math.max(10000, Math.floor((currentChrom?.length || 0) / 1000)),
+      step: alignToBaseWindow(Math.max(10000, (currentChrom?.length || 0) / 1000)),
       limit: 1000 
     }),
     enabled: !!selectedChrom && !!currentChrom,

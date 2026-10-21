@@ -126,3 +126,27 @@ def test_metadata_names_cross_entropy(client):
     meta = client.get("/api/v1/tracks/metadata").json()
     text = meta["hecate_mprob"]["columns"]["avg_mean_entropy"]
     assert "Cross-entropy rate" in text and "bits per base" in text
+
+
+def test_gc_skew_and_window_bins_must_be_window_multiples(client):
+    base = {"build": "synth"}
+    assert client.get("/api/v1/dna/stats/c1/gc-skew", params={**base, "window_size": 1500}).status_code == 422
+    r = client.get("/api/v1/dna/stats/c1/gc-skew", params={**base, "window_size": 2000})
+    assert r.status_code == 200
+    assert client.get("/api/v1/dna/sequence/window", params={**base, "chrom": "c1", "step": 1500}).status_code == 422
+    assert client.get("/api/v1/dna/sequence/window", params={**base, "chrom": "c1", "step": 1000}).status_code == 200
+
+
+@pytest.mark.parametrize("params", [{"k": 99}, {"k": 5}, {"top_n": -1}, {"top_n": 0}])
+def test_kmers_bounds(client, params):
+    r = client.get("/api/v1/dna/stats/c1/kmers", params={"build": "synth", **params})
+    assert r.status_code == 422
+
+
+def test_summary_returns_non_window_tables(client, tmp_path):
+    from app.api.dependencies import get_track_service
+    svc = app.dependency_overrides[get_track_service]()
+    out = svc.data_dir / "tracks" / "synth" / "all"
+    duckdb.connect().execute(f"COPY (SELECT 'A' AS amino_acid, 3 AS count) TO '{out}/aa.parquet' (FORMAT PARQUET)")
+    r = client.get("/api/v1/summary/synth/aa")
+    assert r.status_code == 200 and r.json()["data"] == [{"amino_acid": "A", "count": 3}]

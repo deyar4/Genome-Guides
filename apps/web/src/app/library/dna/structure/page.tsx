@@ -201,7 +201,7 @@ export default function DNAStructurePage() {
         {/* ADDITIONAL FEATURES: ISOCHORES & CPG */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
            <GenomicChartContainer
-             title="Large-scale Genomic Isochores"
+             title="GC-class runs (1 kb windows)"
              subtitle="Bernardi's classification of chromosomal segments by GC content."
              isLoading={isochores.isLoading}
              isError={isochores.isError}
@@ -210,7 +210,7 @@ export default function DNAStructurePage() {
            >
               <div className="space-y-4">
                  <div className="text-[11px] text-slate-500 leading-relaxed italic mb-4">
-                   Isochores are classified into L1 (&lt;37%), L2 (37-41%), H1 (41-46%), H2 (46-52%), and H3 (&gt;52% GC).
+                   Runs of consecutive 1 kb windows in the same GC class: L1 (&lt;37%), L2 (37-41%), H1 (41-46%), H2 (46-53%), H3 (&ge;53% GC). These are not literature isochores, which are defined on much larger windows.
                  </div>
                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
                     <span>Region</span>
