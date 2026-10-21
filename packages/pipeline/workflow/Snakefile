@@ -1,6 +1,12 @@
+import os
+
 # Genome Guides - Primary Snakemake Workflow Entrypoint
 
 configfile: "packages/pipeline/config.yaml"
+
+# Optional untracked per-machine overrides (e.g. tracks: {hecate_bwt: {strict_hash: true}} on the reference machine).
+if os.path.exists("packages/pipeline/config.local.yaml"):
+    configfile: "packages/pipeline/config.local.yaml"
 
 include: "rules/common.smk"
 include: "rules/data.smk"

@@ -57,3 +57,6 @@ target/
 
 # Pinned third-party binaries (built by the workflow, D32)
 tools/
+
+# Per-machine workflow overrides
+packages/pipeline/config.local.yaml
