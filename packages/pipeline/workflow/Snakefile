@@ -49,7 +49,7 @@ rule t2t_all:
         "data/tracks/t2t/all/ssr_hits.parquet",
         "data/tracks/t2t/all/ssr_summary.parquet",
         "data/tracks/t2t/all/ssr_density.parquet",
-        "data/tracks/t2t/all/ssr_enrichment.parquet",
+        "data/tracks/t2t/all/ssr_coverage.parquet",
         "data/tracks/t2t/all/cpg_islands.parquet",
         "data/tracks/t2t/all/kmers_3mer.parquet",
         "data/tracks/t2t/all/kmers_6mer.parquet",

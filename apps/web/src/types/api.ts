@@ -418,3 +418,20 @@ export interface KmerResponse {
   unique_kmers: number;
   kmers: KmerFrequency[];
 }
+
+/** Descriptive SSR coverage per period (D41). No null model; not an enrichment. */
+export interface SSRCoverage {
+  period: number;
+  name: string;
+  count: number;
+  observed_bases: number;
+  genome_bases: number;
+  acgt_bases: number;
+  n_bases: number;
+  other_bases: number;
+  coverage_fraction: number | null;
+  density_per_mb: number | null;
+  sum_ssr_bases: number;
+  union_ssr_bases: number;
+  overlap_excess_bases: number;
+}

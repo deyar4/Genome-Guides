@@ -396,23 +396,17 @@ def get_ssr_density(
     )
 
 
-@router.get("/ssr/enrichment")
-def get_ssr_enrichment(
+@router.get("/ssr/coverage")
+def get_ssr_coverage(
     build: str = Query(...),
-    chrom: Optional[str] = Query(None),
-    top_n: int = Query(20, gt=0, le=1000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
-    path = _read_track(track_service, build, "ssr_enrichment.parquet")
+    """Descriptive SSR coverage per period (genome-wide, D41). No null model: not a measure of enrichment."""
+    path = _read_track(track_service, build, "ssr_coverage.parquet")
     if path is None:
         return []
-    return track_service.execute_query(
-        f"""SELECT name AS motif, observed_bases AS count, period,
-                   observed_bases, genome_bases, genome_ssr_fraction, enrichment
-            FROM read_parquet('{path}')
-            ORDER BY enrichment DESC
-            LIMIT {top_n}"""
-    )
+    return track_service.execute_query(f"SELECT * FROM read_parquet('{path}') ORDER BY period")
+
 
 @router.get("/isochores", response_model=List[IsochoreStats])
 def get_isochores(

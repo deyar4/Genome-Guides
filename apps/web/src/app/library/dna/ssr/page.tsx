@@ -62,10 +62,9 @@ export default function SSRAnalysisPage() {
     queryFn: () => dnaApi.getSSRDensity(activeGenome, selectedChrom, 1000000), // 1Mb bins
     enabled: !!selectedChrom
   });
-  const { data: enrichment = [], isLoading: enrichmentLoading } = useQuery({
-    queryKey: ['ssr-enrichment', activeGenome, selectedChrom],
-    queryFn: () => dnaApi.getSSREnrichment(activeGenome, selectedChrom, 10),
-    enabled: !!selectedChrom,
+  const { data: coverage = [], isLoading: coverageLoading } = useQuery({
+    queryKey: ['ssr-coverage', activeGenome],
+    queryFn: () => dnaApi.getSSRCoverage(activeGenome),
   });
 
   const topHits = useMemo(() => hits || [], [hits]);
@@ -247,21 +246,22 @@ export default function SSRAnalysisPage() {
         <Card className="p-8 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest">Enriched motifs</h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Most frequent repeat motifs from the selected chromosome.</p>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest">Genome-wide SSR coverage by period</h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Descriptive only: bases covered by tandem tracts divided by A/C/G/T bases of the assembly. No null model, so not evidence of over- or under-representation.</p>
             </div>
             <MapPin className="h-4 w-4 text-primary" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-3">
-            {enrichment.map((item) => (
-              <div key={item.motif} className="rounded-xl border border-border bg-muted/30 p-3 text-center">
-                <div className="font-mono text-sm font-bold text-primary">{item.motif}</div>
-                <div className="mt-1 text-[10px] text-muted-foreground">{formatNumber(item.count)} hits</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {coverage.map((item) => (
+              <div key={item.period} className="rounded-xl border border-border bg-muted/30 p-3 text-center">
+                <div className="font-mono text-sm font-bold text-primary">{item.name}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground">{formatNumber(item.count)} tracts</div>
+                <div className="text-[10px] text-muted-foreground">{item.coverage_fraction === null ? 'n/a' : `${(item.coverage_fraction * 100).toFixed(3)} % of ACGT`}</div>
               </div>
             ))}
           </div>
-          {!enrichmentLoading && enrichment.length === 0 && (
-            <p className="text-sm text-muted-foreground">No motif enrichment data is available for this chromosome.</p>
+          {!coverageLoading && coverage.length === 0 && (
+            <p className="text-sm text-muted-foreground">No SSR coverage data is available for this build.</p>
           )}
         </Card>
 

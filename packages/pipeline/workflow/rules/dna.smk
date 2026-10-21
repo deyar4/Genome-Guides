@@ -47,7 +47,7 @@ rule compute_ssrs:
         hits="data/tracks/{genome}/all/ssr_hits.parquet",
         summary="data/tracks/{genome}/all/ssr_summary.parquet",
         density="data/tracks/{genome}/all/ssr_density.parquet",
-        enrichment="data/tracks/{genome}/all/ssr_enrichment.parquet"
+        coverage="data/tracks/{genome}/all/ssr_coverage.parquet"
     params:
         window_size=config["tracks"]["ssr"]["window_size"],
         chunk_bases=config["tracks"]["ssr"]["chunk_bases"]

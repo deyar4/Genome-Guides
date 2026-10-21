@@ -13,6 +13,7 @@ import {
   GeneSummary,
   GeneChromosomeStat,
   IntergenicSpacing,
+  SSRCoverage,
   GeneOverlap,
   GeneSearchResponse,
   NestedGeneSummary,
@@ -95,8 +96,8 @@ export const dnaApi = {
     fetcher<SSRHit[]>("/dna/ssr", { build, chrom, ...params }),
   getSSRDensity: (build: string, chrom: string, window_size = 1000000) =>
     fetcher<SSRDensityWindow[]>("/dna/ssr/density", { build, chrom, window_size }),
-  getSSREnrichment: (build: string, chrom: string, top_n = 20) =>
-    fetcher<{ motif: string; count: number }[]>("/dna/ssr/enrichment", { build, chrom, top_n }),
+  getSSRCoverage: (build: string) =>
+    fetcher<SSRCoverage[]>("/dna/ssr/coverage", { build }),
   getAssembly: (build: string) => fetcher<AssemblyStats>("/dna/stats/assembly", { build }),
   getSequence: (build: string, chrom: string, start: number, end: number) => 
     fetcher<string>("/dna/sequence", { build, chrom, start, end }),

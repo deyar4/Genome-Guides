@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Find tandem repeats (periods 1-6) and emit hits, summaries, density and enrichment."""
+"""Find tandem repeats (periods 1-6) and emit hits, summaries, density and descriptive coverage (D41).
+
+ssr_coverage.parquet is descriptive only: observed SSR bases and counts per period relative to the ACGT bases of the
+assembly, with N and other symbols counted separately. It carries no null model and supports no over- or under-representation
+claim (the former 0.25**period "enrichment" was removed, D41). Soft-masked bases are folded to uppercase and scanned.
+union_ssr_bases counts each base once even when hits of different periods partly overlap (the nested-hit filter only removes
+fully contained calls), so overlap_excess_bases = sum of hit lengths - union is reported, not hidden."""
 
 import argparse
 import gzip
@@ -82,6 +88,9 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
     period_bases = Counter()
     density_counts = Counter()
     total_ssr_bases = 0
+    union_ssr_bases = 0
+    cover_end = 0
+    base_counts = Counter()
     open_fn = gzip.open if str(fasta).endswith(".gz") else open
     chrom, block = None, []
     carry, carry_start, length, block_length = "", 0, 0, 0
@@ -98,7 +107,7 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
 
     def flush(final):
         """Scan carry + new block; emit only hits that cannot change with more sequence (chunk-size independent)."""
-        nonlocal block, carry, carry_start, block_length, total_ssr_bases
+        nonlocal block, carry, carry_start, block_length, total_ssr_bases, union_ssr_bases, cover_end
         if chrom is None:
             return
         combined = carry + "".join(block)
@@ -116,6 +125,8 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
             period_bases[hit["period"]] += hit["length"]
             density_counts[(chrom, (hit["start"] // window_size) * window_size)] += 1
             total_ssr_bases += hit["length"]
+            union_ssr_bases += max(0, hit["end"] - max(hit["start"], cover_end))
+            cover_end = max(cover_end, hit["end"])
         if batch:
             hit_writer.write_table(pa.table({
                 key: pa.array([row[key] for row in batch], type=value)
@@ -131,11 +142,16 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
                     flush(final=True)
                     chrom_lengths[chrom] = length
                 chrom = line[1:].split()[0]
+                cover_end = 0
                 block, carry, carry_start, length, block_length = [], "", 0, 0, 0
             else:
                 # Soft-masked (lowercase) bases are sequence too: T2T is 61.7 % lowercase, and the repeats are mostly there.
                 sequence = line.strip().upper()
                 block.append(sequence)
+                acgt = sequence.count("A") + sequence.count("C") + sequence.count("G") + sequence.count("T")
+                base_counts["acgt"] += acgt
+                base_counts["n"] += sequence.count("N")
+                base_counts["other"] += len(sequence) - acgt - sequence.count("N")
                 length += len(sequence)
                 block_length += len(sequence)
                 if block_length >= chunk_bases:
@@ -159,16 +175,19 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
         "count": count,
     } for (chrom, start), count in sorted(density_counts.items())]
 
-    genome_length = sum(chrom_lengths.values()) or 1
-    genome_ssr_bases = total_ssr_bases
-    enrichment = []
+    genome_length = sum(chrom_lengths.values())
+    acgt_bases = base_counts["acgt"]
+    coverage = []
     for period in sorted(PERIOD_NAMES):
         observed = period_bases[period]
-        expected = genome_length * (0.25 ** period)
-        enrichment.append({
-            "period": period, "name": PERIOD_NAMES[period], "observed_bases": observed,
-            "genome_bases": genome_length, "genome_ssr_fraction": genome_ssr_bases / genome_length,
-            "enrichment": observed / expected if expected else 0.0,
+        coverage.append({
+            "period": period, "name": PERIOD_NAMES[period], "count": period_counts[period], "observed_bases": observed,
+            "genome_bases": genome_length, "acgt_bases": acgt_bases, "n_bases": base_counts["n"],
+            "other_bases": base_counts["other"],
+            "coverage_fraction": observed / acgt_bases if acgt_bases else None,
+            "density_per_mb": period_counts[period] / acgt_bases * 1e6 if acgt_bases else None,
+            "sum_ssr_bases": total_ssr_bases, "union_ssr_bases": union_ssr_bases,
+            "overlap_excess_bases": total_ssr_bases - union_ssr_bases,
         })
 
     write(out / "ssr_summary.parquet", summaries, {
@@ -178,9 +197,11 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
     write(out / "ssr_density.parquet", density, {
         "chrom": pa.string(), "start": pa.uint64(), "end": pa.uint64(), "count": pa.uint64(),
     })
-    write(out / "ssr_enrichment.parquet", enrichment, {
-        "period": pa.uint8(), "name": pa.string(), "observed_bases": pa.uint64(),
-        "genome_bases": pa.uint64(), "genome_ssr_fraction": pa.float64(), "enrichment": pa.float64(),
+    write(out / "ssr_coverage.parquet", coverage, {
+        "period": pa.uint8(), "name": pa.string(), "count": pa.uint64(), "observed_bases": pa.uint64(),
+        "genome_bases": pa.uint64(), "acgt_bases": pa.uint64(), "n_bases": pa.uint64(), "other_bases": pa.uint64(),
+        "coverage_fraction": pa.float64(), "density_per_mb": pa.float64(),
+        "sum_ssr_bases": pa.uint64(), "union_ssr_bases": pa.uint64(), "overlap_excess_bases": pa.uint64(),
     })
 
 
