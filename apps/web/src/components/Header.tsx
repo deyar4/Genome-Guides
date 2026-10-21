@@ -18,7 +18,7 @@ export function Header({ isServerLive, selectedGenome, setSelectedGenome, select
             <h1 className="text-md font-bold tracking-tight text-foreground flex items-center gap-2">
               Genome Guides Track Engine
               {isServerLive === true && <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20">Live DB</span>}
-              {isServerLive === false && <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-400 ring-1 ring-inset ring-cyan-500/20">Local Sim</span>}
+              {isServerLive === false && <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-400 ring-1 ring-inset ring-cyan-500/20">API offline: no data shown</span>}
             </h1>
             <p className="text-[11px] text-muted-foreground">High-throughput coordinate-based multi-track browser</p>
           </div>

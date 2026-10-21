@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { TrackDataPoint, GapFeature, HomopolymerFeature, ShannonEntropyPoint, GeneDensityPoint, RepeatDensityPoint, GeneModelFeature, RepeatFamilyFeature, TrackCache, HecateMprobPoint } from "../types";
 
 export const genomeLengths: Record<string, Record<string, number>> = {
@@ -35,81 +35,6 @@ export function useGenomeData(selectedGenome: string, selectedContig: string, st
   useEffect(() => {
     clearCache();
   }, [selectedGenome, selectedContig]);
-
-  // Simulation Data Generator for Offline Mode
-  const generateSimulatedData = useCallback((genome: string, contig: string, start: number, end: number) => {
-    const len = end - start;
-    const gc: TrackDataPoint[] = [];
-    const numPoints = 600;
-    const step = len / numPoints;
-
-    for (let i = 0; i < numPoints; i++) {
-      const coord = Math.floor(start + i * step);
-      const wave1 = Math.sin(coord / 1500) * 8;
-      const wave2 = Math.cos(coord / 300) * 4;
-      const wave3 = Math.sin(coord / 50) * 2;
-      const avg_value = Math.max(0, Math.min(100, 42 + wave1 + wave2 + wave3));
-      const skewWave = Math.sin(coord / 2000) * 0.15 + Math.cos(coord / 400) * 0.05;
-
-      gc.push({
-        bin_start: coord,
-        avg_value: avg_value,
-        min_value: Math.max(0, avg_value - 3),
-        max_value: Math.min(100, avg_value + 3),
-        avg_skew: skewWave,
-      });
-    }
-
-    const gaps: GapFeature[] = [];
-    if (genome === "chrm") {
-      gaps.push({ contig, start_pos: 4000, end_pos: 4120, gap_length: 120, gap_type: "assembly_gap" });
-      gaps.push({ contig, start_pos: 11200, end_pos: 11250, gap_length: 50, gap_type: "assembly_gap" });
-    }
-
-    const homopolymers: HomopolymerFeature[] = [];
-    const bases = ["A", "C", "G", "T"];
-    const seed = genome === "chrm" ? 42 : 101;
-    const spacing = genome === "tiny" ? 8 : 1200;
-    const size = genome === "tiny" ? 5 : 18;
-    for (let pos = Math.floor(start / spacing) * spacing; pos < end; pos += spacing) {
-      if (pos < 0) continue;
-      const base = bases[Math.floor(Math.abs(Math.sin(pos + seed)) * 4)];
-      const hLen = Math.floor(Math.abs(Math.cos(pos + seed)) * 12) + size;
-      homopolymers.push({ contig, start_pos: pos, end_pos: pos + hLen, base, run_length: hLen });
-    }
-
-    const entropy: ShannonEntropyPoint[] = [];
-    for (let i = 0; i < numPoints; i++) {
-      const coord = Math.floor(start + i * step);
-      const entVal = 1.35 + Math.sin(coord / 800) * 0.25 + Math.cos(coord / 200) * 0.1;
-      entropy.push({
-        bin_start: coord,
-        avg_shannon_entropy: entVal,
-        min_shannon_entropy: entVal - 0.05,
-        max_shannon_entropy: entVal + 0.05,
-        avg_telomeric_repeats: coord > currentMaxLen - 5000 || coord < 5000 ? 5 : 0
-      });
-    }
-
-    const geneDensity: GeneDensityPoint[] = [];
-    const repeatDensity: RepeatDensityPoint[] = [];
-    for (let i = 0; i < numPoints; i++) {
-      const coord = Math.floor(start + i * step);
-      const gdVal = Math.max(0, 2 + Math.sin(coord / 25000) * 5 + Math.cos(coord / 5000) * 2);
-      const rdVal = Math.max(0, 15 + Math.sin(coord / 15000) * 20 + Math.cos(coord / 3000) * 8);
-      geneDensity.push({ bin_start: coord, avg_count: gdVal });
-      repeatDensity.push({ bin_start: coord, avg_te_count: rdVal });
-    }
-
-    const geneModels: GeneModelFeature[] = [];
-    const repeatFamilies: RepeatFamilyFeature[] = [];
-    if (genome === "chrm") {
-      geneModels.push({ contig, start_pos: 200, end_pos: 1200, gene_id: "MT-TF", gene_name: "MT-TF", biotype: "tRNA", strand: "+" });
-      geneModels.push({ contig, start_pos: 1600, end_pos: 3200, gene_id: "MT-RNR1", gene_name: "MT-RNR1", biotype: "rRNA", strand: "+" });
-    }
-
-    return { gc, gaps, homopolymers, entropy, geneDensity, repeatDensity, geneModels, repeatFamilies, hecate_mprob: [] };
-  }, [currentMaxLen]);
 
   useEffect(() => {
     const fetchTrackData = async () => {
@@ -218,7 +143,7 @@ export function useGenomeData(selectedGenome: string, selectedContig: string, st
     
     const delayDebounce = setTimeout(fetchTrackData, 50);
     return () => clearTimeout(delayDebounce);
-  }, [selectedGenome, selectedContig, startPos, endPos, currentMaxLen, generateSimulatedData]);
+  }, [selectedGenome, selectedContig, startPos, endPos, currentMaxLen]);
 
   return {
     currentMaxLen, isServerLive, loading,
