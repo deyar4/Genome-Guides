@@ -48,7 +48,7 @@ Run the small configured target:
 mamba run -n genome-guides snakemake \
   -s packages/pipeline/workflow/Snakefile \
   --cores 4 \
-  --resources mem_mb=16000
+  --resources mem_mb=8192
 ```
 
 Run the configured chromosome or telomere-to-telomere targets:
@@ -57,19 +57,21 @@ Run the configured chromosome or telomere-to-telomere targets:
 mamba run -n genome-guides snakemake \
   -s packages/pipeline/workflow/Snakefile \
   --cores 8 \
-  --resources mem_mb=16000 \
+  --resources mem_mb=8192 \
   chrm_all
 
 mamba run -n genome-guides snakemake \
   -s packages/pipeline/workflow/Snakefile \
   --cores 8 \
-  --resources mem_mb=16000 \
+  --resources mem_mb=8192 \
   t2t_all
 ```
 
-Use `--dry-run` before a large execution. Increase `--resources mem_mb` on
-machines with more available memory; do not change analytical code to raise a
-fixed memory ceiling.
+Use `--dry-run` before a large execution. The 8192 MB resource budget is
+intentional: the Hecate rule declares the full budget, so Snakemake runs it
+alone instead of overlapping it with other analytical jobs. Increase the
+budget only when the host has enough free memory and the Hecate rule's
+declared resource is increased accordingly.
 
 ## Resource and memory policy
 
@@ -139,7 +141,7 @@ git diff --check
 mamba run -n genome-guides snakemake \
   -s packages/pipeline/workflow/Snakefile \
   --cores 1 \
-  --resources mem_mb=16000 \
+  --resources mem_mb=8192 \
   --dry-run
 ```
 

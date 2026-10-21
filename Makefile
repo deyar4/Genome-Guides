@@ -10,11 +10,11 @@ env-update:
 
 pipeline-chrm:
 	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --unlock || true
-	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --cores 8 chrm_all
+	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --cores 8 --resources mem_mb=8192 chrm_all
 
 pipeline-t2t:
 	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --unlock || true
-	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --cores 8 --rerun-incomplete t2t_all
+	mamba run -n genome-guides snakemake -s packages/pipeline/workflow/Snakefile --cores 12 --resources mem_mb=12000 --rerun-incomplete t2t_all
 
 backend-dev:
 	cd apps/backend && uv run uvicorn app.main:app --reload --port 8000
