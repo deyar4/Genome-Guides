@@ -6,7 +6,7 @@ MEM_MB ?= 8192
 RUN    := mamba run -n genome-guides
 SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(CORES) --resources mem_mb=$(MEM_MB) --rerun-incomplete
 
-.PHONY: env-create env-update unlock pipeline-chrm pipeline-t2t backend-dev test check check-coverage clean clean-chrm clean-t2t
+.PHONY: env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -21,6 +21,16 @@ unlock:
 pipeline-chrm:
 	$(SMK) -- chrm_all
 
+pipeline-tiny:
+	$(SMK) -- all
+
+# 1 Mb satellite slice (tests/fixtures/satslice.fa): runs the real gc, entropy and hecate rules, about 1 min
+pipeline-satslice:
+	$(SMK) -- satslice_all
+
+golden: pipeline-satslice
+	$(RUN) python3 -m pytest -q tests/golden
+
 pipeline-t2t:
 	$(SMK) -- t2t_all
 
@@ -32,8 +42,16 @@ test:
 	$(RUN) python3 -m pytest -q packages/pipeline/scripts/tests
 	cd apps/backend && $(RUN) uv run pytest
 
-# Everything that can be checked without a long run: unit tests, then the tiling check of the t2t window tracks when present.
-check: test check-coverage
+# Everything that can be checked in a few minutes: unit tests, workflow dry run, tiny and 1 Mb satellite runs with golden
+# comparison, frontend lint+build, and the tiling check of the t2t window tracks when present.
+check: test dry-run pipeline-tiny golden web-build check-coverage
+
+dry-run:
+	$(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores 1 --dry-run --quiet -- all chrm_all t2t_all
+
+web-build:
+	$(RUN) pnpm --filter web run lint
+	$(RUN) pnpm --filter web run build
 
 check-coverage:
 	@if [ -f data/raw/t2t.fa.fai ] && [ -f data/tracks/t2t/all/gc_content.parquet ]; then \

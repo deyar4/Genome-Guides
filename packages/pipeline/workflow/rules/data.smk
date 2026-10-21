@@ -134,3 +134,19 @@ rule download_t2t_repeatmasker:
         exec > {log} 2>&1
         python3 packages/pipeline/scripts/common/fetch_verified.py --url {params.url} --sha256 {params.sha256} --output {output}
         """
+
+
+# Test fixtures staged as ordinary genomes so the real rules run on them (Step 3 safety net).
+# satslice = chr1:126,300,000-127,299,999 (0-based, 999,999 bp, odd length on purpose) of T2T-CHM13v2.0 with a satellite array.
+rule stage_fixture:
+    input:
+        fasta="tests/fixtures/{name}.fa"
+    output:
+        fasta="data/raw/{name}.fa"
+    wildcard_constraints:
+        name="tiny|satslice"
+    threads: 1
+    resources:
+        mem_mb=256
+    shell:
+        "mkdir -p data/raw && cp {input.fasta} {output.fasta}"

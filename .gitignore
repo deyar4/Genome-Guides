@@ -60,3 +60,7 @@ tools/
 
 # Per-machine workflow overrides
 packages/pipeline/config.local.yaml
+
+# Small test fixtures are tracked on purpose (tests/fixtures)
+!tests/fixtures/*.fa
+!tests/fixtures/*.fa.fai

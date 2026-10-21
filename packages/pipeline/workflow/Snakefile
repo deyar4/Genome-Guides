@@ -24,6 +24,13 @@ rule all:
         "data/tracks/tiny/all/sequence_stats.txt",
         "data/tracks/tiny/all/hecate_mprob.parquet"
 
+rule satslice_all:
+    input:
+        "data/raw/satslice.fa.fai",
+        "data/tracks/satslice/all/gc_content.parquet",
+        "data/tracks/satslice/all/shannon_entropy.parquet",
+        "data/tracks/satslice/all/hecate_mprob.parquet"
+
 rule chrm_all:
     input:
         "data/raw/chrm.fa.fai",
