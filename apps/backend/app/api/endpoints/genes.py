@@ -167,9 +167,9 @@ def search_genes(
     res = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig, start_pos, end_pos
         FROM read_parquet('{models_file}')
-        WHERE gene_name ILIKE '%{q}%' OR gene_id ILIKE '%{q}%'
+        WHERE gene_name ILIKE ? OR gene_id ILIKE ?
         LIMIT 50
-    """)
+    """, [f"%{q}%", f"%{q}%"])
     
     results = []
     for row in res:
@@ -213,10 +213,10 @@ def get_region(
         SELECT gene_id, gene_name, biotype, contig AS chrom,
                start_pos AS start, end_pos AS end, strand
         FROM read_parquet('{path}')
-        WHERE contig = '{chrom}' AND start_pos < {end} AND end_pos > {start}
+        WHERE contig = ? AND start_pos < ? AND end_pos > ?
         ORDER BY start_pos
         LIMIT 500
-    """)
+    """, [chrom, end, start])
 
 
 @router.get("/density")
@@ -228,13 +228,13 @@ def get_density(
 ):
     path = _track_path(track_service, build, "gene_models.parquet")
     return track_service.execute_query(f"""
-        SELECT CAST(FLOOR(start_pos / {bin_size}) * {bin_size} AS BIGINT) AS start,
+        SELECT CAST(FLOOR(start_pos / ?) * ? AS BIGINT) AS start,
                COUNT(*) AS count
         FROM read_parquet('{path}')
-        WHERE contig = '{chrom}'
+        WHERE contig = ?
         GROUP BY 1
         ORDER BY 1
-    """)
+    """, [bin_size, bin_size, chrom])
 
 
 @router.get("/stats/sizes")
@@ -270,7 +270,8 @@ def get_spacing(
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = _track_path(track_service, build, "gene_spacing.parquet")
-    where = f"WHERE contig = '{chrom}'" if chrom else ""
+    where = "WHERE contig = ?" if chrom else ""
+    params = [chrom] if chrom else []
     return track_service.execute_query(f"""
         SELECT contig AS chrom, gene1_id AS gene_id_1, gene2_id AS gene_id_2,
                0 AS start, 0 AS end, intergenic_dist AS distance
@@ -278,7 +279,7 @@ def get_spacing(
         {where}
         ORDER BY intergenic_dist DESC
         LIMIT 1000
-    """)
+    """, params)
 
 
 @router.get("/overlaps")
@@ -288,7 +289,8 @@ def get_overlaps(
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = _track_path(track_service, build, "gene_overlaps.parquet")
-    where = f"WHERE contig = '{chrom}'" if chrom else ""
+    where = "WHERE contig = ?" if chrom else ""
+    params = [chrom] if chrom else []
     return track_service.execute_query(f"""
         SELECT contig AS chrom, gene1_id AS gene_id_1, gene2_id AS gene_id_2,
                CASE WHEN same_strand = 1 THEN 'same_strand' ELSE 'opposite_strand' END AS overlap_type
@@ -296,7 +298,7 @@ def get_overlaps(
         {where}
         ORDER BY gene_id_1, gene_id_2
         LIMIT 1000
-    """)
+    """, params)
 
 
 def _correlation(sample: list[list[float]], interpretation: str = ""):
@@ -405,9 +407,9 @@ def get_gene(
         SELECT gene_id, gene_name, biotype, contig AS chrom,
                start_pos AS start, end_pos AS end, strand
         FROM read_parquet('{path}')
-        WHERE gene_id = '{gene_id}' OR gene_name = '{gene_id}'
+        WHERE gene_id = ? OR gene_name = ?
         LIMIT 1
-    """)
+    """, [gene_id, gene_id])
     if not rows:
         raise HTTPException(status_code=404, detail=f"Gene '{gene_id}' not found")
     gene = rows[0]
@@ -424,9 +426,9 @@ def get_gene(
             SELECT transcript_id, gene_id, biotype,
                    start_pos AS start, end_pos AS end, strand
             FROM read_parquet('{transcripts_path}')
-            WHERE gene_id = '{gene_key}'
+            WHERE gene_id = ?
             ORDER BY start_pos
-        """)
+        """, [gene_key])
         for tx in tx_rows:
             tx_id = tx["transcript_id"]
             tx["exons"] = []
@@ -435,24 +437,24 @@ def get_gene(
                     SELECT exon_number, start_pos AS start, end_pos AS end,
                            strand, transcript_id
                     FROM read_parquet('{exons_path}')
-                    WHERE transcript_id = '{tx_id}'
+                    WHERE transcript_id = ?
                     ORDER BY start_pos
-                """)
+                """, [tx_id])
             if utrs_path.exists():
                 tx["utrs"] = track_service.execute_query(f"""
                     SELECT start_pos AS start, end_pos AS end, strand,
                            transcript_id, utr_type
                     FROM read_parquet('{utrs_path}')
-                    WHERE transcript_id = '{tx_id}'
+                    WHERE transcript_id = ?
                     ORDER BY start_pos
-                """)
+                """, [tx_id])
             transcripts.append(tx)
 
     architecture = []
     if architecture_path.exists():
         architecture = track_service.execute_query(f"""
             SELECT * FROM read_parquet('{architecture_path}')
-            WHERE gene_id = '{gene_key}'
+            WHERE gene_id = ?
             ORDER BY transcript_id
-        """)
+        """, [gene_key])
     return {**gene, "transcripts": transcripts, "architecture": architecture}

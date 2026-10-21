@@ -219,10 +219,10 @@ class DuckDBTrackService:
             results = results[:INTERVAL_ROW_LIMIT]
         return results, truncated
 
-    def execute_query(self, query: str) -> List[Dict[str, Any]]:
+    def execute_query(self, query: str, params: Optional[list] = None) -> List[Dict[str, Any]]:
         """Execute a generic SQL query against DuckDB and return dictionaries."""
         with self._lock:
-            rel = self.conn.execute(query)
+            rel = self.conn.execute(query, params or [])
             desc = [d[0] for d in rel.description]
             results = []
             for row in rel.fetchall():
