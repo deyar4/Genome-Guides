@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+import logging
+
+import duckdb
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
@@ -19,6 +23,19 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    logger = logging.getLogger(__name__)
+
+    @app.exception_handler(duckdb.IOException)
+    async def missing_data_handler(request: Request, exc: duckdb.IOException):
+        # A track file that does not exist for this build is "not found", not a server error. No path in the message.
+        logger.warning("data file unavailable for %s: %s", request.url.path, exc)
+        return JSONResponse(status_code=404, content={"detail": "Data not available for this build"})
+
+    @app.exception_handler(duckdb.Error)
+    async def query_error_handler(request: Request, exc: duckdb.Error):
+        logger.exception("query failed for %s", request.url.path)
+        return JSONResponse(status_code=500, content={"detail": "Query failed"})
 
     app.include_router(api_router, prefix=settings.API_V1_STR)
     app.include_router(api_router, prefix="/api", include_in_schema=False)

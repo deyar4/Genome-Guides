@@ -40,8 +40,10 @@ def get_composition(
         query = f"SELECT amino_acid, count, frequency_pct as percentage FROM read_parquet('{path}')"
         data = track_service.execute_query(query)
         return data if data else []
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query protein composition: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query protein composition") from exc
 
 @router.get("/stats/terminal")
 def get_terminal_composition(
@@ -53,8 +55,10 @@ def get_terminal_composition(
         query = f"SELECT amino_acid, n_terminal_count, n_terminal_pct, c_terminal_count, c_terminal_pct, n_to_c_bias_ratio FROM read_parquet('{path}')"
         data = track_service.execute_query(query)
         return data if data else []
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query terminal composition: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query terminal composition") from exc
 
 @router.get("/top/largest")
 def get_largest(
@@ -94,8 +98,10 @@ def get_homopolymers(
         query = f"SELECT amino_acid, start_pos as start, end_pos as end, repeat_len as length, protein_id FROM read_parquet('{path}')"
         data = track_service.execute_query(query)
         return data if data else []
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query protein homopolymers: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query protein homopolymers") from exc
 
 
 @router.get("/rich")

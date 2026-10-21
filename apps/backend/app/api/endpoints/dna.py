@@ -168,8 +168,10 @@ def get_dinucleotides(
             base_frequencies={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
             dinucleotides=dinucs
         )
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query dinucleotide track: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query dinucleotide track") from exc
 
 @router.get("/telomeres", response_model=List[TelomereHit])
 def get_telomeres(
@@ -259,8 +261,10 @@ def get_gaps(
                 gap_type=r.get("gap_type", "N")
             ))
         return gaps
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query assembly gaps: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query assembly gaps") from exc
 
 @router.get("/cpg-islands", response_model=List[CpGIslandHit])
 def get_cpg_islands(
@@ -286,8 +290,10 @@ def get_cpg_islands(
                 obs_exp_ratio=float(r.get("obs_exp_ratio", 0))
             ))
         return islands
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query CpG islands: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query CpG islands") from exc
 
 @router.get("/stats/{chrom}/kmers", response_model=KmerResponse)
 def get_kmers(
@@ -306,8 +312,10 @@ def get_kmers(
         for r in res:
             kmers.append(KmerFrequency(kmer=r.get("kmer",""), count=int(r.get("count",0)), frequency=float(r.get("frequency",0))))
         return KmerResponse(k=k, total_kmers=sum([x.count for x in kmers]), unique_kmers=len(kmers), kmers=kmers)
+    except duckdb.IOException:
+        raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query k-mer track: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Failed to query k-mer track") from exc
 
 @router.get("/ssr", response_model=List[SSRHit])
 def get_ssr(
