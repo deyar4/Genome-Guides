@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[4]
 CHECKS = ROOT / "packages/pipeline/scripts/checks"
 sys.path.insert(0, str(CHECKS))
 from cpg_grid_shift import intersection_bp  # noqa: E402
+from cpg_calibration import covered_upto, merge, overlap_bp  # noqa: E402
+import numpy as np  # noqa: E402
 
 
 def read_tsv(path):
@@ -71,3 +73,15 @@ def test_recount_passes_on_true_island_and_fails_on_wrong_count(tmp_path):
     assert read_tsv(tmp_path / "g.tsv")["mismatch_cpg_count"] == "0"
     assert subprocess.run(args + ["--parquet", str(bad), "--out", str(tmp_path / "b.tsv")]).returncode == 1
     assert read_tsv(tmp_path / "b.tsv")["mismatch_cpg_count"] == "1"
+
+
+def test_calibration_interval_overlap_matches_bruteforce():
+    rng = np.random.default_rng(3)
+    raw = [(int(a), int(a) + int(rng.integers(1, 30))) for a in rng.integers(0, 400, 60)]
+    starts, ends = merge(raw)
+    cov = np.zeros(500, bool)
+    for a, b in raw:
+        cov[a:b] = True
+    for s, e in [(0, 500), (10, 10), (37, 120), (399, 431), (450, 499)]:
+        assert int(overlap_bp(starts, ends, np.array([s]), np.array([e]))[0]) == int(cov[s:e].sum())
+    assert covered_upto(*merge([]), np.array([5])).tolist() == [0]

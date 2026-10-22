@@ -31,6 +31,22 @@ reference:
     url: "https://hgdownload.soe.ucsc.edu/goldenPath/hs1/bigZips/hs1.repeatMasker.out.gz"
     sha256: "c90541b64bb236ce53f3fa7d9081084475c37c053fff68d800c2abc6fcaf1193"
 
+# Calibration inputs for scripts/checks/cpg_calibration.py (Q3 in PROFESSOR_QUESTIONS). UCSC hg38 chr21/chr22 only; they never
+# feed thesis tracks and do not change the T2T reference (D1). sha256 of the downloaded .gz bytes, trust on first use (2026-10-22).
+calibration:
+  hg38_chr21:
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr21.fa.gz"
+    sha256: "c979ca1e5065c2521a50773473e0d0cc018fd6f3e9bb3aa90493fe7b45d57d1b"
+  hg38_chr22:
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr22.fa.gz"
+    sha256: "05f9d97d6fbfd08a44ca45b50837ca2ae9c471f35ba79dffec04d2cb5eaaf695"
+  hg38_cpg_islands:  # UCSC cpgIslandExt, made by a modified cpg_lh program (unpublished); parameters not checked
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/cpgIslandExt.txt.gz"
+    sha256: "2339f8bad0ec9993211287b319b8d59ddeff30a5010505f649817332ed8222f8"
+  hg38_rmsk:  # 156 MB, whole genome; filtered to chr21/chr22 by the script, the .gz is kept only for the hash
+    url: "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/rmsk.txt.gz"
+    sha256: "db60e6aa7ac175f8f5465cd01b48b550e67e1fb0fd828608d8343481867bb276"
+
 defaults:
   # 1 kb balances local sequence variation against browser-scale track size.
   window_size: 1000

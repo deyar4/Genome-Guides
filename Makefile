@@ -6,7 +6,7 @@ MEM_MB ?= 8192
 RUN    := mamba run -n genome-guides
 SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(CORES) --resources mem_mb=$(MEM_MB) --rerun-incomplete
 
-.PHONY: check-numbers env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
+.PHONY: check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -63,6 +63,11 @@ check-numbers:
 	mkdir -p artifacts/checks/cpg_legacy_work
 	$(RUN) python3 packages/pipeline/scripts/checks/cpg_legacy_equality.py --fasta data/raw/t2t.fa --fai data/raw/t2t.fa.fai --workdir artifacts/checks/cpg_legacy_work --out artifacts/checks/cpg_legacy_equality.tsv
 	rm -rf artifacts/checks/cpg_legacy_work
+
+# CpG calibration on hg38 chr21/22 (downloads about 182 MB once) and the T2T island breakdown by RepeatMasker class.
+check-calibration:
+	$(RUN) bash packages/pipeline/scripts/checks/cpg_calibration.sh
+	$(RUN) python3 packages/pipeline/scripts/checks/cpg_calibration.py --islands data/tracks/t2t/all/cpg_islands.parquet --rmsk data/raw/t2t_repeatmasker.out.gz --contigs $$(cut -f1 data/raw/t2t.fa.fai) --out artifacts/checks/cpg_calibration_t2t.tsv
 
 check-coverage:
 	@if [ -f data/raw/t2t.fa.fai ] && [ -f data/tracks/t2t/all/gc_content.parquet ]; then \
