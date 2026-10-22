@@ -6,7 +6,7 @@ MEM_MB ?= 8192
 RUN    := mamba run -n genome-guides
 SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(CORES) --resources mem_mb=$(MEM_MB) --rerun-incomplete
 
-.PHONY: env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
+.PHONY: check-numbers env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -52,6 +52,17 @@ dry-run:
 web-build:
 	$(RUN) pnpm --filter web run lint
 	$(RUN) pnpm --filter web run build
+
+# Recomputes the numbers quoted in the logbook/specs for the CpG and gene-unit analyses; each check writes a TSV to
+# artifacts/checks/. The legacy-equality check re-runs the old bedtools/seqkit pipeline: several minutes, about 8 GB disk.
+check-numbers:
+	mkdir -p artifacts/checks
+	$(RUN) python3 packages/pipeline/scripts/checks/gene_unit_checks.py --tracks-dir data/tracks/t2t/all --out artifacts/checks/gene_unit_checks.tsv
+	$(RUN) python3 packages/pipeline/scripts/checks/cpg_island_recount.py --fasta data/raw/t2t.fa --parquet data/tracks/t2t/all/cpg_islands.parquet --out artifacts/checks/cpg_island_recount.tsv
+	$(RUN) python3 packages/pipeline/scripts/checks/cpg_grid_shift.py --fasta data/raw/t2t.fa --fai data/raw/t2t.fa.fai --baseline-parquet data/tracks/t2t/all/cpg_islands.parquet --out artifacts/checks/cpg_grid_shift.tsv
+	mkdir -p artifacts/checks/cpg_legacy_work
+	$(RUN) python3 packages/pipeline/scripts/checks/cpg_legacy_equality.py --fasta data/raw/t2t.fa --fai data/raw/t2t.fa.fai --workdir artifacts/checks/cpg_legacy_work --out artifacts/checks/cpg_legacy_equality.tsv
+	rm -rf artifacts/checks/cpg_legacy_work
 
 check-coverage:
 	@if [ -f data/raw/t2t.fa.fai ] && [ -f data/tracks/t2t/all/gc_content.parquet ]; then \

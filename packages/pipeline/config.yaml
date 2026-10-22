@@ -65,6 +65,8 @@ tracks:
     strict_min_oe: "13/20"
     # Bases read per block (memory knob, does not change results).
     block_bases: 16000000
+    # Seed of the 200-island sample recounted from the FASTA by scripts/checks/cpg_island_recount.py.
+    recount_seed: 20261022
   # gc_content and the hecate cross-entropy track use a fixed 1000 bp grid (D31): `-W 1000` in trivial_cli.smk and `-w 1000`
   # in dna.smk. They are literals, not config, so no key here can silently disagree with the results.
   shannon_entropy:
