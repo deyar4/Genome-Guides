@@ -9,7 +9,7 @@ import { Search, Loader2, ExternalLink, Info, Database, Fingerprint } from 'luci
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, geneHref } from '@/lib/utils';
 import { useDNAStats } from '@/hooks/use-dna-stats';
 import { Button } from '@/components/ui/button';
 import { 
@@ -131,7 +131,7 @@ export default function GeneSearchPage() {
             {filteredResults && filteredResults.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
                 {filteredResults.map((gene) => (
-                  <Link key={gene.gene_id} href={`/library/genes/${gene.gene_id}`} className="block group">
+                  <Link key={`${gene.gene_id}:${gene.chrom}`} href={geneHref(gene.gene_id, gene.chrom)} className="block group">
                     <Card className="hover:border-primary/40 transition-all duration-300 group-hover:shadow-md group-hover:-translate-y-0.5 overflow-hidden border-slate-200 dark:border-zinc-800">
                       <CardContent className="p-0">
                         <div className="p-6 flex items-center justify-between">

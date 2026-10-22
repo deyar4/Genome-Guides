@@ -5,11 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useGenomeStore } from '@/store/use-genome-store';
 import { genesApi } from '@/lib/api';
 import { LibraryShell } from '@/components/layout/library-shell';
-import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, geneHref } from '@/lib/utils';
 import { Info, Activity, Layers, ChevronRight } from 'lucide-react';
 import { Transcript, Exon } from '@/types/api';
 import { GenomicMetricCard } from '@/components/library/dna/genomic-metric-card';
@@ -21,12 +22,13 @@ import { SequenceExporter } from '@/components/library/genes/sequence-exporter';
 export default function GeneFactSheetPage() {
   const params = useParams();
   const id = params.id as string;
+  const chromParam = useSearchParams().get('chrom') ?? undefined;
   const { activeGenome } = useGenomeStore();
   const [showAllTranscripts, setShowAllTranscripts] = React.useState(false);
 
   const { data: gene, isLoading } = useQuery({
-    queryKey: ['gene', activeGenome, id],
-    queryFn: () => genesApi.getGene(activeGenome, id),
+    queryKey: ['gene', activeGenome, id, chromParam],
+    queryFn: () => genesApi.getGene(activeGenome, id, chromParam),
   });
 
   if (isLoading) {
@@ -84,6 +86,25 @@ export default function GeneFactSheetPage() {
             color="#8b5cf6"
           />
         </div>
+
+        {/* OTHER COPIES (PAR genes exist once per contig) */}
+        {gene.other_copies && gene.other_copies.length > 0 && (
+          <section>
+            <SectionHeader
+              title="Copies on other contigs"
+              subtitle={`This gene id is annotated on ${gene.other_copies.length + 1} contigs. Showing ${gene.chrom}${chromParam ? '' : ' (first copy)'}.`}
+            />
+            <div className="flex flex-wrap gap-3">
+              {gene.other_copies.map((c) => (
+                <Link key={c.chrom} href={geneHref(c.gene_id, c.chrom)}>
+                  <Badge variant="outline" className="px-3 py-1.5 font-mono text-xs hover:border-primary/40">
+                    {c.chrom}:{formatNumber(c.start)}-{formatNumber(c.end)}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* NEIGHBORHOOD */}
         <section>

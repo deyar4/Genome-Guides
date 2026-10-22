@@ -7,7 +7,7 @@ import { genesApi } from '@/lib/api';
 import { LibraryShell } from '@/components/layout/library-shell';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, geneHref } from '@/lib/utils';
 import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-container';
 import { GenomicMetricCard } from '@/components/library/dna/genomic-metric-card';
 import { SectionHeader } from '@/components/library/dna/shared';
@@ -144,7 +144,7 @@ export default function GeneCensusPage() {
                 </h4>
                 <div className="space-y-4">
                    {largest?.slice(0, 5).map((g, i) => (
-                      <Link key={g.gene_id} href={`/library/genes/${g.gene_id}`} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl hover:ring-1 ring-primary transition-all group">
+                      <Link key={g.gene_id} href={geneHref(g.gene_id, g.chrom)} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl hover:ring-1 ring-primary transition-all group">
                          <div className="flex items-center gap-3">
                             <span className="text-xs font-bold text-slate-300">#{i+1}</span>
                             <div className="flex flex-col">
@@ -169,7 +169,7 @@ export default function GeneCensusPage() {
                 </h4>
                 <div className="space-y-4">
                    {mostExons?.slice(0, 5).map((g, i) => (
-                      <Link key={g.gene_id} href={`/library/genes/${g.gene_id}`} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl hover:ring-1 ring-primary transition-all group">
+                      <Link key={g.gene_id} href={geneHref(g.gene_id, g.chrom)} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-zinc-900 rounded-xl hover:ring-1 ring-primary transition-all group">
                          <div className="flex items-center gap-3">
                             <span className="text-xs font-bold text-slate-300">#{i+1}</span>
                             <div className="flex flex-col">

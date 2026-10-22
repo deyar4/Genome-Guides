@@ -1,5 +1,6 @@
 "use client"
 
+import { geneHref } from "@/lib/utils"
 import * as React from "react"
 import { Search, Loader2, FileText, Layout, Dna, Target, Shapes, Activity, Database, Crosshair } from "lucide-react"
 import { Command } from "cmdk"
@@ -32,9 +33,9 @@ export function CommandMenu() {
     enabled: search.length >= 2,
   })
 
-  const onSelect = (id: string) => {
+  const onSelect = (id: string, chrom?: string) => {
     setOpen(false)
-    router.push(`/library/genes/${id}`)
+    router.push(geneHref(id, chrom))
   }
 
   return (
@@ -80,8 +81,8 @@ export function CommandMenu() {
             <Command.Group heading="Genes" className="px-2 py-2 text-[10px] font-bold uppercase text-slate-400 tracking-widest">
               {results?.map((gene) => (
                 <Command.Item
-                  key={gene.gene_id}
-                  onSelect={() => onSelect(gene.gene_id)}
+                  key={`${gene.gene_id}:${gene.chrom}`}
+                  onSelect={() => onSelect(gene.gene_id, gene.chrom)}
                   className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer aria-selected:bg-slate-100 dark:aria-selected:bg-zinc-800 transition-colors"
                 >
                   <div className="p-2 bg-slate-50 dark:bg-zinc-950 rounded-lg">

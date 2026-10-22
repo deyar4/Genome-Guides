@@ -128,7 +128,7 @@ export const genesApi = {
   getSpacing: (build: string, chrom?: string) => fetcher<CappedList<IntergenicSpacing>>("/genes/spacing", { build, ...(chrom ? { chrom } : {}) }),
   getOverlaps: (build: string, chrom?: string) => fetcher<CappedList<GeneOverlap>>("/genes/overlaps", { build, ...(chrom ? { chrom } : {}) }),
   getCpgAssociation: (build: string, promoter_distance = 2000) => fetcher<CpGAssociation>("/genes/cpg-association", { build, promoter_distance }),
-  getGene: (build: string, id: string) => fetcher<Gene>(`/genes/${id}`, { build }),
+  getGene: (build: string, id: string, chrom?: string) => fetcher<Gene>(`/genes/${encodeURIComponent(id)}`, { build, ...(chrom ? { chrom } : {}) }),
 };
 
 export const rnaApi = {

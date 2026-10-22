@@ -163,6 +163,8 @@ export interface Gene {
   start: number;
   end: number;
   strand: string;
+  /** Same gene id on other contigs (PAR genes); empty for single-copy genes. */
+  other_copies?: { gene_id: string; chrom: string; start: number; end: number }[];
   transcripts: Transcript[];
 }
 

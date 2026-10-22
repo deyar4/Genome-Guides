@@ -387,21 +387,21 @@ def get_gene(
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = _track_path(track_service, build, "gene_models.parquet")
-    contig_sql = "AND contig = ?" if chrom else ""
     rows = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig AS chrom,
                start_pos AS start, end_pos AS end, strand
         FROM read_parquet('{path}')
-        WHERE (gene_id = ? OR gene_name = ?) {contig_sql}
+        WHERE (gene_id = ? OR gene_name = ?)
         ORDER BY contig, start_pos, gene_id
-    """, [gene_id, gene_id] + ([chrom] if chrom else []))
-    if not rows:
+    """, [gene_id, gene_id])
+    # PAR genes exist once per contig: the first copy (contig, start order) is returned unless chrom selects one, and
+    # the remaining copies are always listed (also when chrom is given), never dropped silently.
+    selected = [r for r in rows if r["chrom"] == chrom] if chrom else rows
+    if not selected:
         raise HTTPException(status_code=404, detail=f"Gene '{gene_id}' not found")
-    gene = rows[0]
-    # PAR genes exist once per contig: the first copy (contig, start order) is returned and the others are listed,
-    # never dropped silently. Pass chrom to select one.
+    gene = selected[0]
     other_copies = [{"gene_id": r["gene_id"], "chrom": r["chrom"], "start": r["start"], "end": r["end"]}
-                    for r in rows[1:]]
+                    for r in rows if r is not gene]
     gene_key = gene.get("gene_id", gene_id)
     base = track_service.data_dir / "tracks" / build / "all"
     transcripts_path = base / "transcripts.parquet"

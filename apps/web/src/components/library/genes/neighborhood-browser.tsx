@@ -6,7 +6,7 @@ import { genesApi } from '@/lib/api';
 import { useGenomeStore } from '@/store/use-genome-store';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, geneHref } from '@/lib/utils';
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 
 interface NeighborhoodBrowserProps {
@@ -61,7 +61,7 @@ export function NeighborhoodBrowser({ chrom, start, end, centerGeneId }: Neighbo
                 return (
                   <Link 
                     key={gene.gene_id} 
-                    href={`/library/genes/${gene.gene_id}`}
+                    href={geneHref(gene.gene_id, gene.chrom)}
                     className={cn(
                       "flex flex-col items-center gap-2 transition-all duration-300",
                       isCenter ? "scale-110" : "opacity-40 hover:opacity-100 hover:scale-105"

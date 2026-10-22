@@ -32,11 +32,11 @@ def client(tmp_path_factory):
 
 
 def test_chrom_selects_copy_and_its_transcripts(client):
-    for chrom, tx in (("chrX", "TX"), ("chrY", "TY")):
+    for chrom, tx, other in (("chrX", "TX", "chrY"), ("chrY", "TY", "chrX")):
         r = client.get("/api/v1/genes/PAR1", params={"build": "synth", "chrom": chrom}).json()
         assert r["chrom"] == chrom
         assert [t["transcript_id"] for t in r["transcripts"]] == [tx]
-        assert r["other_copies"] == []
+        assert [c["chrom"] for c in r["other_copies"]] == [other]
 
 
 def test_without_chrom_is_deterministic_and_lists_other_copy(client):

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useGenomeStore } from '@/store/use-genome-store';
-import { rnaApi } from '@/lib/api';
+import { dnaApi, rnaApi } from '@/lib/api';
 import { LibraryShell } from '@/components/layout/library-shell';
 import { 
   Table, 
@@ -40,10 +40,15 @@ export default function RnaClustersPage() {
     queryFn: () => rnaApi.getClusters(activeGenome, { rna_type: rnaType === 'all' ? undefined : rnaType, chrom: chrom === 'all' ? undefined : chrom }),
   });
 
+  const { data: chromList } = useQuery({
+    queryKey: ['chromosomes', activeGenome],
+    queryFn: () => dnaApi.getChromosomes(activeGenome),
+  });
+
   const clusters = clusterResp?.clusters;
 
   const rnaTypes = summary?.cluster_summaries.map(s => s.rna_type) || [];
-  const chromosomes = Array.from(new Set(clusters?.map(c => c.chrom) || [])).sort();
+  const chromosomes = chromList?.chromosomes.map(c => c.name) || [];
 
   return (
     <LibraryShell 

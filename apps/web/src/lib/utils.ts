@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Gene page link; chrom selects one copy of a gene that exists on several contigs (PAR genes). */
+export function geneHref(geneId: string, chrom?: string | null): string {
+  const base = `/library/genes/${encodeURIComponent(geneId)}`;
+  return chrom ? `${base}?chrom=${encodeURIComponent(chrom)}` : base;
+}
+
 export function formatNumber(num: number): string {
   return new Intl.NumberFormat('en-US').format(num);
 }
