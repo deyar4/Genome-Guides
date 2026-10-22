@@ -45,7 +45,7 @@ class DinucleotideStats(BaseModel):
     pair: str
     observed_count: int
     observed_freq: float
-    expected_freq: float
+    expected_freq: Optional[float] = None  # null when the base counts needed for f(x) f(y) are absent
     oe_ratio: float
 
 class GenomeDinucleotides(BaseModel):

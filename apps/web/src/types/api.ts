@@ -47,7 +47,7 @@ export interface DinucleotideStats {
   pair: string;
   observed_count: number;
   observed_freq: number;
-  expected_freq: number;
+  expected_freq: number | null;
   oe_ratio: number;
 }
 

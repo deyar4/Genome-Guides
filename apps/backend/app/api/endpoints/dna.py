@@ -221,7 +221,7 @@ def get_dinucleotides(
         counts = _contig_counts(track_service, build)
         sec = _section(counts)
         acgt = (sec.a + sec.c + sec.g + sec.t) if sec else 0
-        # ACGT frequencies over the whole assembly, N excluded; None-equivalent (empty) when the counts are absent
+        # ACGT frequencies over the whole assembly, N excluded; empty (and expected_freq null) when the counts are absent
         base_freq = {b: getattr(sec, b.lower()) / acgt for b in "ACGT"} if acgt else {}
         dinucs = []
         total = 0
@@ -232,8 +232,7 @@ def get_dinucleotides(
                 observed_count=int(row.get('count', 0)),
                 observed_freq=float(row.get('frequency_pct', 0)) / 100.0,
                 # expected under independence: f(x) f(y) from the genome base frequencies
-                expected_freq=(base_freq[pair[:1]] * base_freq[pair[1:]] if base_freq
-                              else float(row.get('frequency_pct', 0)) / 100.0 / max(1.0, float(row.get('odds_ratio', 1.0)))),
+                expected_freq=base_freq[pair[:1]] * base_freq[pair[1:]] if base_freq else None,
                 oe_ratio=float(row.get('odds_ratio', 0))
             ))
             total += int(row.get('count', 0))
