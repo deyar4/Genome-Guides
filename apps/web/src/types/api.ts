@@ -437,6 +437,14 @@ export interface BuildResponse {
   status: string;
 }
 
+export interface TrackMetadataEntry {
+  window_bp: number;
+  columns: Record<string, string>;
+}
+
+/** /tracks/metadata: per-track definitions plus the shared binning notes. */
+export type TrackMetadata = Record<string, TrackMetadataEntry> & { binning?: string[] };
+
 export interface SystemHealth {
   status: string;
   version: string;

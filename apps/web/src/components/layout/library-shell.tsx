@@ -24,6 +24,12 @@ export function LibraryShell({ children, title, subtitle }: LibraryShellProps) {
     staleTime: 30_000,
     retry: 1,
   });
+  const { data: health } = useQuery({
+    queryKey: ['system-health'],
+    queryFn: systemApi.getHealth,
+    staleTime: 300_000,
+    retry: 1,
+  });
   const serviceReady = readiness?.status === 'ready';
 
   return (
@@ -51,7 +57,7 @@ export function LibraryShell({ children, title, subtitle }: LibraryShellProps) {
           </div>
 
           <div className="flex items-center gap-4">
-            <div className={cn(
+            <div title={health ? `API version ${health.version}` : undefined} className={cn(
               "hidden sm:flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold",
               serviceReady ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400"
             )}>

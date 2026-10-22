@@ -2,6 +2,7 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrackSettingsDialog } from "./TrackSettingsDialog";
+import { TrackDefinitionsDialog } from "./TrackDefinitionsDialog";
 import { TrackConfig } from "./BrowserCanvas";
 
 interface BrowserControlsProps {
@@ -55,6 +56,7 @@ export function BrowserControls({
         <button onClick={() => handleZoom(1.3)} className="px-2.5 py-1 bg-secondary text-secondary-foreground border border-border rounded-md text-xs hover:bg-accent hover:text-accent-foreground transition cursor-pointer">Zoom out</button>
         <button onClick={() => handlePan(Math.floor((endPos - startPos) * 0.25))} className="px-2.5 py-1 bg-secondary text-secondary-foreground border border-border rounded-md text-xs hover:bg-accent hover:text-accent-foreground transition cursor-pointer">Pan →</button>
         
+        <TrackDefinitionsDialog />
         <TrackSettingsDialog 
           tracks={tracks}
           toggleTrack={toggleTrack}

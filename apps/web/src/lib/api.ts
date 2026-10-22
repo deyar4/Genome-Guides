@@ -35,6 +35,7 @@ import {
   AssemblyGapHit,
   KmerResponse,
   SystemHealth,
+  TrackMetadata,
   SystemReady,
   TrackDataResponse
 } from "@/types/api";
@@ -165,6 +166,7 @@ export const systemApi = {
 };
 
 export const tracksApi = {
+  getMetadata: () => fetcher<TrackMetadata>("/tracks/metadata"),
   getSummary: <T = Record<string, unknown>>(genome: string, trackName: string) =>
     fetcher<TrackDataResponse<T>>(`/summary/${genome}/${trackName}`),
 };
