@@ -6,12 +6,9 @@ import { LibraryShell } from '@/components/layout/library-shell';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatNumber, formatGb, formatMb } from '@/lib/utils';
-import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 import { SectionHeader } from '@/components/library/dna/shared';
-import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-container';
 import { GenomicMetricCard } from '@/components/library/dna/genomic-metric-card';
-import { useChartTheme } from '@/hooks/use-chart-theme';
-import { TrendingUp, Info, BarChart3 } from 'lucide-react';
+import { Info, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChromosomeMap } from '@/components/library/dna/chromosome-map';
 
@@ -24,33 +21,20 @@ export default function ChromosomeMetricsPage() {
     setSelectedChrom,
     centromeres,
     telomeres,
-    isLoading,
-    isError
+    isLoading
   } = useDNAStats();
 
-  const chartTheme = useChartTheme();
 
   const maxLen = useMemo(() => 
     primaryChroms.length > 0 ? Math.max(...primaryChroms.map(c => c.length)) : 0, 
   [primaryChroms]);
-
-  const scatterData = useMemo(() => {
-    return [{
-      id: 'Chromosomes',
-      data: primaryChroms.map(c => ({
-        x: c.length / 1e6,
-        y: c.gc_content,
-        name: c.name
-      }))
-    }];
-  }, [primaryChroms]);
 
   const assembly = summary.data?.assembly;
 
   return (
     <LibraryShell 
       title="Chromosome Metrics" 
-      subtitle="Physical dimensions and morphological characterization of the primary scaffolds."
+      subtitle="Length, GC content and GC skew per sequence of T2T-CHM13v2.0."
     >
       <div className="space-y-16 pb-20">
         
@@ -90,8 +74,7 @@ export default function ChromosomeMetricsPage() {
         <section>
           <SectionHeader 
             title="Karyotype Landscape" 
-            subtitle="Interactive visual distribution of primary scaffolds with centromere annotations."
-            badge="Interactive Map"
+            subtitle="Sequence lengths with centromere regions and telomere records from the annotation."
           />
           <Card className="p-8 border-slate-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-950 overflow-hidden">
              {isLoading ? (
@@ -118,8 +101,7 @@ export default function ChromosomeMetricsPage() {
         <section>
           <SectionHeader 
             title="Karyotype Registry" 
-            subtitle="Quantitative reference for primary scaffolds and structural dimensions."
-            badge="Reference Standard"
+            subtitle="Length (bp), GC content (%) and GC skew 100*(G-C)/(G+C) (%) per sequence."
           />
           <Card className="border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden bg-white dark:bg-zinc-950">
             <div className="max-h-[600px] overflow-auto custom-scrollbar">
@@ -207,87 +189,11 @@ export default function ChromosomeMetricsPage() {
           </Card>
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-          {/* Scatter Plot: Length vs GC */}
-          <GenomicChartContainer 
-            title="Compositional Bias" 
-            subtitle="The inverse correlation between chromosome size and GC density."
-            isLoading={isLoading}
-            isError={isError}
-            height="h-[450px]"
-          >
-            <ResponsiveScatterPlot
-              data={scatterData}
-              margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
-              xScale={{ type: 'linear', min: 0, max: 'auto' }}
-              yScale={{ type: 'linear', min: 35, max: 55 }}
-              axisBottom={{
-                tickSize: 5,
-                tickPadding: 10,
-                tickRotation: 0,
-                legend: 'Scaffold Length (Mb)',
-                legendPosition: 'middle',
-                legendOffset: 45
-              }}
-              axisLeft={{
-                tickSize: 5,
-                tickPadding: 10,
-                tickRotation: 0,
-                legend: 'GC Content (%)',
-                legendPosition: 'middle',
-                legendOffset: -45
-              }}
-              colors="#3b82f6"
-              nodeSize={10}
-              theme={chartTheme}
-              tooltip={({ node }) => (
-                <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg text-[11px] shadow-xl border border-slate-200 dark:border-zinc-800">
-                  <div className="font-bold border-b border-slate-100 dark:border-zinc-800 pb-1 mb-1">{node.data.name}</div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                     <span className="text-slate-400">Length:</span>
-                     <span className="font-mono text-right">{node.data.x.toFixed(1)} Mb</span>
-                     <span className="text-slate-400">GC:</span>
-                     <span className="font-mono text-right text-emerald-500">{node.data.y.toFixed(2)}%</span>
-                  </div>
-                </div>
-              )}
-            />
-          </GenomicChartContainer>
-
-          {/* Academic Insight */}
-          <section className="flex flex-col justify-center">
-            <div className="space-y-6">
-               <div className="p-2 w-fit rounded-full bg-primary/10 text-primary">
-                  <TrendingUp className="h-6 w-6" />
-               </div>
-               <h3 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100">Understanding Isochores</h3>
-               <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
-                 Genomic composition is not uniform. The scatter plot reveals a well-documented academic phenomenon: smaller human chromosomes (like 19, 22) tend to be more GC-rich than larger ones.
-               </p>
-               <p className="text-slate-500 dark:text-zinc-400 leading-relaxed">
-                 This is linked to the distribution of &quot;Isochores&quot;—large genomic regions with relatively homogeneous base composition. High GC areas are often associated with:
-               </p>
-               <ul className="space-y-3">
-                  {[
-                    "Higher gene density and transcriptional activity.",
-                    "Higher recombination rates during meiosis.",
-                    "Altered chromatin structure and accessibility."
-                  ].map((text, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-slate-600 dark:text-zinc-400">
-                       <div className="mt-1 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                       {text}
-                    </li>
-                  ))}
-               </ul>
-            </div>
-          </section>
-        </div>
-
         {/* Assembly Quality Analysis */}
         <section>
           <SectionHeader 
             title="Assembly Quality Metrics" 
-            subtitle="Technical indicators of reference genome continuity and completeness."
+            subtitle="N50 and L50 computed over all sequences of the assembly."
           />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
              <Card className="p-8 bg-primary text-primary-foreground border-none shadow-2xl relative overflow-hidden group">
@@ -324,7 +230,7 @@ export default function ChromosomeMetricsPage() {
                       })()}
                    </div>
                    <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed italic">
-                      Overall GC content across the assembly. Significant deviations from expected ~41% can indicate sequencing bias or abnormal composition.
+                      GC content: 100*(G+C)/(A+C+G+T) over the whole assembly.
                    </p>
                 </div>
              </Card>

@@ -62,7 +62,6 @@ const navigation: NavSection[] = [
       { href: '/library/genes/search', label: 'Gene Reference', icon: Search },
       { href: '/library/genes/architecture', label: 'Architecture & Size', icon: Layers },
       { href: '/library/genes/distribution', label: 'Genomic Distribution', icon: Target },
-      { href: '/library/genes/correlations', label: 'Genomic Correlations', icon: Activity },
       { href: '/library/genes/spacing', label: 'Spacing & Overlaps', icon: Shapes },
     ]
   },

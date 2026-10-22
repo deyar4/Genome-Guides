@@ -32,8 +32,6 @@ import {
   IsochoreStats,
   CpGIslandHit,
   AssemblyGapHit,
-  CorrelationResult,
-  UTRCorrelation,
   KmerResponse,
   SystemHealth,
   SystemReady,
@@ -120,9 +118,6 @@ export const genesApi = {
   search: (build: string, q: string) => fetcher<GeneSearchResponse[]>("/genes/search", { build, q }),
   getChromosomeStats: (build: string) => fetcher<GeneChromosomeStat[]>("/genes/stats/chromosomes", { build }),
   getNested: (build: string) => fetcher<NestedGeneSummary>("/genes/nested/summary", { build }),
-  getCorrelationExonSize: (build: string) => fetcher<CorrelationResult>("/genes/stats/correlations/exon-size", { build }),
-  getCorrelationDensitySize: (build: string) => fetcher<CorrelationResult>("/genes/stats/correlations/density-size", { build }),
-  getCorrelationUtrMrna: (build: string) => fetcher<UTRCorrelation>("/genes/stats/correlations/utr-mrna", { build }),
   getRegion: (build: string, chrom: string, start: number, end: number) => 
     fetcher<Gene[]>("/genes/region", { build, chrom, start, end }),
   getDensity: (build: string, chrom: string, bin_size = 1000000) => 

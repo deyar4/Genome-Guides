@@ -237,19 +237,6 @@ export interface NestedGeneSummary {
   sample: NestedGenePair[];
 }
 
-export interface CorrelationResult {
-  r_value: number;
-  p_value: number | null;
-  n: number;
-  interpretation: string;
-  sample: number[][];
-}
-
-export interface UTRCorrelation {
-  utr_5prime_correlation: CorrelationResult;
-  utr_3prime_correlation: CorrelationResult;
-}
-
 export interface CpGAssociation {
   with_cpg: number;
   without_cpg: number;
