@@ -50,6 +50,20 @@ interface BrowserCanvasProps {
   setEndPos: (pos: number) => void;
 }
 
+/** Per-view scale from the plotted values: [lo, hi] with 5 % padding; null values ignored; never NaN or a zero-height range. */
+function autoRange(values: (number | null | undefined)[], zeroBased = false): [number, number] {
+  const v = values.filter((x): x is number => typeof x === "number" && Number.isFinite(x));
+  if (v.length === 0) return [0, 1];
+  let lo = zeroBased ? Math.min(0, ...v) : Math.min(...v);
+  let hi = Math.max(...v);
+  if (hi === lo) { const d = Math.abs(hi) > 0 ? Math.abs(hi) * 0.05 : 1; lo -= d; hi += d; }
+  else if (!zeroBased) { const pad = (hi - lo) * 0.05; lo -= pad; hi += pad; }
+  else { hi += (hi - lo) * 0.05; }
+  return [lo, hi];
+}
+
+const fmtScale = (x: number) => (Math.abs(x) >= 100 ? x.toFixed(0) : Math.abs(x) >= 10 ? x.toFixed(1) : x.toFixed(2));
+
 export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncatedTracks = {}, tracks, theme, hoverCoord, setHoverCoord, setHoverData, setStartPos, setEndPos }: BrowserCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dragStartRef = useRef<{ x: number; start: number; end: number } | null>(null);
@@ -175,13 +189,14 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
         drawBox(currentTop, track.height, track.title);
         
         if (track.id === 'gc' && gcData.length > 0) {
+          const [gcLo, gcHi] = autoRange(gcData.map(d => d.avg_value));
           ctx.beginPath();
           let first = true;
           gcData.forEach((pt) => {
             // a missing bin breaks the line instead of drawing a value
             if (pt.avg_value == null) { first = true; return; }
             const x = bpToX(pt.bin_start);
-            const y = currentTop + track.height - 6 - Math.max(0, Math.min(1, (pt.avg_value - 20) / 60)) * (track.height - 32);
+            const y = currentTop + track.height - 6 - ((pt.avg_value - gcLo) / (gcHi - gcLo)) * (track.height - 32);
             if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
           });
           ctx.strokeStyle = isDark ? "#22d3ee" : "#0284c7";
@@ -190,16 +205,17 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "9px monospace";
           ctx.textAlign = "right";
-          ctx.fillText("GC %, display range 20 to 80 (clamped)", width - 8, currentTop + 14);
+          ctx.fillText(`GC %, axis ${fmtScale(gcLo)} to ${fmtScale(gcHi)} (auto, this view)`, width - 8, currentTop + 14);
         } 
         else if (track.id === 'entropy' && entropyData.length > 0) {
+          const [enLo, enHi] = autoRange(entropyData.map(d => d.avg_shannon_entropy));
           ctx.beginPath();
           let first = true;
           entropyData.forEach((pt) => {
             // NULL entropy (window with too few ACGT bases) breaks the line; never substitute a value
             if (pt.avg_shannon_entropy == null) { first = true; return; }
             const x = bpToX(pt.bin_start);
-            const y = currentTop + track.height - 6 - Math.max(0, Math.min(1, (pt.avg_shannon_entropy - 0.8) / 1.2)) * (track.height - 32);
+            const y = currentTop + track.height - 6 - ((pt.avg_shannon_entropy - enLo) / (enHi - enLo)) * (track.height - 32);
             if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
           });
           ctx.strokeStyle = isDark ? "#fbbf24" : "#d97706";
@@ -208,7 +224,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "9px monospace";
           ctx.textAlign = "right";
-          ctx.fillText("bits (base composition), display range 0.8 to 2.0 (clamped)", width - 8, currentTop + 14);
+          ctx.fillText(`bits (base composition), axis ${fmtScale(enLo)} to ${fmtScale(enHi)} (auto, this view)`, width - 8, currentTop + 14);
         }
         else if ((track.id === 'density' && geneDensityData.length > 0) || (track.id === 'repeat-density' && repeatDensityData.length > 0)) {
           const plotTop = currentTop + 26;
@@ -224,7 +240,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
               ctx.fillRect(x, plotTop + plotHeight - barHeight, barWidth, barHeight);
             });
           };
-          const densityScale = track.id === 'density' ? 15 : 500;
+          const densityScale = autoRange((track.id === 'density' ? geneDensityData.map(d => d.avg_count) : repeatDensityData.map(d => d.avg_te_count)), true)[1];
           if (track.id === 'density') {
             drawDensity(geneDensityData.map(pt => ({ bin_start: pt.bin_start, value: pt.avg_count })), isDark ? "rgba(52, 211, 153, 0.8)" : "rgba(5, 150, 105, 0.72)", densityScale);
           } else {
@@ -233,7 +249,7 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "9px monospace";
           ctx.textAlign = "right";
-          ctx.fillText(`bar height: count per window, display max ${densityScale} (clamped)`, width - 8, currentTop + 14);
+          ctx.fillText(`bar height: count per window, axis 0 to ${fmtScale(densityScale)} (auto, this view)`, width - 8, currentTop + 14);
         }
         else if (track.id === 'gaps') {
           gapData.forEach((gap) => {
@@ -267,8 +283,8 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
         else if (track.id === 'hecate' && hecateMprobData.length > 0) {
           const plotTop = currentTop + 26;
           const plotHeight = track.height - 32;
-          const maxBits = 2.5; // display scale only; values above are clamped, typical range 0 to about 2 bits/base
-          const yForBits = (bits: number) => plotTop + plotHeight - Math.max(0, Math.min(maxBits, bits)) / maxBits * plotHeight;
+          const [hLo, hHi] = autoRange(hecateMprobData.flatMap(d => [d.mean_entropy, d.min_entropy, d.max_entropy]));
+          const yForBits = (bits: number) => plotTop + plotHeight - ((bits - hLo) / (hHi - hLo)) * plotHeight;
 
           // min/max band of the window values inside each bin (only bins with data)
           const valid = hecateMprobData.filter((pt) => pt.mean_entropy !== null && pt.min_entropy !== null && pt.max_entropy !== null);
@@ -303,8 +319,8 @@ export function BrowserCanvas({ startPos, endPos, currentMaxLen, data, truncated
           ctx.fillStyle = colors.trackTitle;
           ctx.font = "9px monospace";
           ctx.textAlign = "right";
-          ctx.fillText(`${maxBits.toFixed(1)} bits/base`, width - 8, plotTop + 9);
-          ctx.fillText("0", width - 8, plotTop + plotHeight);
+          ctx.fillText(`${fmtScale(hHi)} bits/base (auto, this view)`, width - 8, plotTop + 9);
+          ctx.fillText(fmtScale(hLo), width - 8, plotTop + plotHeight);
         }
 
         // explicit empty / capped notices (an empty lane must not be read as a measured zero)
