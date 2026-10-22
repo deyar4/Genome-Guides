@@ -284,6 +284,9 @@ def get_size_stats(
     }
 
 
+SPACING_LIMIT = 1000  # rows returned by /spacing and /overlaps; the response reports total and truncated
+
+
 @router.get("/spacing")
 def get_spacing(
     build: str = Query(...),
@@ -296,16 +299,21 @@ def get_spacing(
     params = [chrom] if chrom else []
     # The gap is [end of the covering gene, start of gene 2) (half-open, 0-based);
     # the parquet keeps only its length, so the start of gene 2 (unique per (contig, gene_id)) gives both ends.
-    return track_service.execute_query(f"""
+    total = track_service.execute_query(f"""
+        SELECT COUNT(*) AS n FROM read_parquet('{path}') s
+        JOIN read_parquet('{models}') m ON m.gene_id = s.gene2_id AND m.contig = s.contig
+        {where}""", params)[0]["n"]
+    items = track_service.execute_query(f"""
         SELECT s.contig AS chrom, s.gene1_id AS gene_id_1, s.gene2_id AS gene_id_2,
                CAST(m.start_pos AS BIGINT) - s.intergenic_dist AS start,
                CAST(m.start_pos AS BIGINT) AS end, s.intergenic_dist AS distance
         FROM read_parquet('{path}') s
         JOIN read_parquet('{models}') m ON m.gene_id = s.gene2_id AND m.contig = s.contig
         {where}
-        ORDER BY s.intergenic_dist DESC
-        LIMIT 1000
+        ORDER BY s.intergenic_dist DESC, s.contig, s.gene1_id
+        LIMIT {SPACING_LIMIT}
     """, params)
+    return {"total": total, "returned": len(items), "truncated": total > len(items), "items": items}
 
 
 @router.get("/overlaps")
@@ -317,15 +325,17 @@ def get_overlaps(
     path = _track_path(track_service, build, "gene_overlaps.parquet")
     where = "WHERE contig = ?" if chrom else ""
     params = [chrom] if chrom else []
-    return track_service.execute_query(f"""
+    total = track_service.execute_query(f"SELECT COUNT(*) AS n FROM read_parquet('{path}') {where}", params)[0]["n"]
+    items = track_service.execute_query(f"""
         SELECT contig AS chrom, gene1_id AS gene_id_1, gene2_id AS gene_id_2,
                CASE WHEN same_strand = 1 THEN 'same_strand' ELSE 'opposite_strand' END AS overlap_type,
                overlap_len, contained = 1 AS contained
         FROM read_parquet('{path}')
         {where}
-        ORDER BY gene_id_1, gene_id_2
-        LIMIT 1000
+        ORDER BY chrom, gene_id_1, gene_id_2
+        LIMIT {SPACING_LIMIT}
     """, params)
+    return {"total": total, "returned": len(items), "truncated": total > len(items), "items": items}
 
 
 @router.get("/cpg-association")

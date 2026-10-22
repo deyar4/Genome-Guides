@@ -35,10 +35,12 @@ export default function RnaClustersPage() {
     queryFn: () => rnaApi.getSummary(activeGenome),
   });
 
-  const { data: clusters, isLoading } = useQuery({
+  const { data: clusterResp, isLoading } = useQuery({
     queryKey: ['rna-clusters', activeGenome, rnaType, chrom],
     queryFn: () => rnaApi.getClusters(activeGenome, { rna_type: rnaType === 'all' ? undefined : rnaType, chrom: chrom === 'all' ? undefined : chrom }),
   });
+
+  const clusters = clusterResp?.clusters;
 
   const rnaTypes = summary?.cluster_summaries.map(s => s.rna_type) || [];
   const chromosomes = Array.from(new Set(clusters?.map(c => c.chrom) || [])).sort();
@@ -84,7 +86,7 @@ export default function RnaClustersPage() {
           
           <div className="ml-auto">
              <Badge variant="outline" className="px-3 py-1 text-xs font-mono">
-                {clusters && clusters.length >= 5000 ? 'First 5,000 clusters (API cap; narrow with the filters)' : `${clusters?.length || 0} Clusters Found`}
+                {clusterResp?.truncated ? `First ${clusterResp.returned.toLocaleString()} of ${clusterResp.total.toLocaleString()} clusters (API cap; narrow with the filters)` : `${clusterResp?.total ?? 0} Clusters Found`}
              </Badge>
           </div>
         </div>

@@ -90,7 +90,7 @@ export function ChromosomeMap({ chromosomes, centromeres, telomeres, onSelect, s
 
                         {/* Telomere Visualization */}
                         {chromTelomeres?.map((t, i) => {
-                          const telomereStart = (t as { start?: number; position?: number }).start ?? (t as { position?: number }).position ?? 0;
+                          const telomereStart = t.start;
                           return (
                             <div 
                               key={i}
@@ -137,7 +137,7 @@ export function ChromosomeMap({ chromosomes, centromeres, telomeres, onSelect, s
                               <div className="flex gap-1 flex-wrap">
                                  {chromTelomeres.map((t, idx) => (
                                     <Badge key={idx} variant="secondary" className="text-[8px] px-1.5 py-0 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-none uppercase">
-                                       {(t as TelomereHit).location?.replace('_', ' ') || 'Hit'}
+                                       {t.length.toLocaleString()} bp
                                     </Badge>
                                  ))}
                               </div>

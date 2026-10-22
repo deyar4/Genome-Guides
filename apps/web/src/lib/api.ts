@@ -19,7 +19,6 @@ import {
   NestedGeneSummary,
   Gene,
   CpGAssociation,
-  RNACluster,
   RNASummary,
   HostGuestResponse,
   SpliceSiteConsensus,
@@ -28,6 +27,8 @@ import {
   AminoAcidComposition,
   TerminalComposition,
   ProteinBase,
+  CappedList,
+  RNAClusterResponse,
   HomopolymerTract,
   IsochoreStats,
   CpGIslandResponse,
@@ -124,8 +125,8 @@ export const genesApi = {
   getDensity: (build: string, chrom: string, bin_size = 1000000) => 
     fetcher<{ start: number; count: number }[]>("/genes/density", { build, chrom, bin_size }),
   getSizeStats: (build: string) => fetcher<Record<string, Record<string, number>>>("/genes/stats/sizes", { build }),
-  getSpacing: (build: string, chrom?: string) => fetcher<IntergenicSpacing[]>("/genes/spacing", { build, ...(chrom ? { chrom } : {}) }),
-  getOverlaps: (build: string, chrom?: string) => fetcher<GeneOverlap[]>("/genes/overlaps", { build, ...(chrom ? { chrom } : {}) }),
+  getSpacing: (build: string, chrom?: string) => fetcher<CappedList<IntergenicSpacing>>("/genes/spacing", { build, ...(chrom ? { chrom } : {}) }),
+  getOverlaps: (build: string, chrom?: string) => fetcher<CappedList<GeneOverlap>>("/genes/overlaps", { build, ...(chrom ? { chrom } : {}) }),
   getCpgAssociation: (build: string, promoter_distance = 2000) => fetcher<CpGAssociation>("/genes/cpg-association", { build, promoter_distance }),
   getGene: (build: string, id: string) => fetcher<Gene>(`/genes/${id}`, { build }),
 };
@@ -133,7 +134,7 @@ export const genesApi = {
 export const rnaApi = {
   getSummary: (build: string) => fetcher<RNASummary>("/rna/stats/summary", { build }),
   getClusters: (build: string, params: { rna_type?: string, chrom?: string } = {}) => 
-    fetcher<RNACluster[]>("/rna/clusters", { build, ...params }),
+    fetcher<RNAClusterResponse>("/rna/clusters", { build, ...params }),
   getRelationships: (build: string, params: { contig?: string, host_gene_id?: string, guest_gene_id?: string, limit?: number, offset?: number } = {}) =>
     fetcher<HostGuestResponse>("/rna/relationships", { build, ...params }),
   getSpliceConsensus: (build: string, site_type?: string) => 

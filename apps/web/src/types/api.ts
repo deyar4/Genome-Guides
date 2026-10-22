@@ -87,13 +87,10 @@ export interface SSRHit {
 
 export interface TelomereHit {
   chrom: string;
-  position: number;
+  start: number; // 0-based, half-open [start, end)
   end: number;
-  strand: string;
-  repeat_count: number;
-  sequence: string;
-  location: string;
   length: number;
+  source: string;
 }
 
 export interface CentromereRegion {
@@ -276,6 +273,20 @@ export interface RNACluster {
   end: number;
   size: number;
   genes: string[];
+}
+
+export interface RNAClusterResponse {
+  total: number;
+  returned: number;
+  truncated: boolean;
+  clusters: RNACluster[];
+}
+
+export interface CappedList<T> {
+  total: number;
+  returned: number;
+  truncated: boolean;
+  items: T[];
 }
 
 export interface RNAClusterSummary {

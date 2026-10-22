@@ -54,14 +54,12 @@ class GenomeDinucleotides(BaseModel):
     dinucleotides: List[DinucleotideStats]
 
 class TelomereHit(BaseModel):
+    """Interval from the T2T telomere BED (half-open, 0-based). The BED has no strand, repeat count or sequence."""
     chrom: str
-    position: int
+    start: int
     end: int
-    strand: str
-    repeat_count: int
-    sequence: str
-    location: str
     length: int
+    source: str
 
 class CentromereRegion(BaseModel):
     chrom: str

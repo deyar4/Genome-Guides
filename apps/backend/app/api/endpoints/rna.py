@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 
 from app.api.dependencies import get_track_service
 from app.services.duckdb_track_service import DuckDBTrackService
@@ -49,7 +50,17 @@ def get_summary(
         "cluster_summaries": summaries
     }
 
-@router.get("/clusters", response_model=List[RNACluster])
+CLUSTER_LIMIT = 5000  # rows returned by /clusters; the response reports total and truncated
+
+
+class RNAClusterResponse(BaseModel):
+    total: int
+    returned: int
+    truncated: bool
+    clusters: List[RNACluster]
+
+
+@router.get("/clusters", response_model=RNAClusterResponse)
 def get_clusters(
     build: str = Query(...),
     rna_type: Optional[str] = Query(None),
@@ -58,7 +69,7 @@ def get_clusters(
 ):
     path = track_service.data_dir / "tracks" / build / "all" / "rna_clusters.parquet"
     if not path.exists():
-        return []
+        return RNAClusterResponse(total=0, returned=0, truncated=False, clusters=[])
     filters, params = [], []
     if rna_type:
         filters.append("rna_type = ?")
@@ -67,18 +78,19 @@ def get_clusters(
         filters.append("chrom = ?")
         params.append(chrom)
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
+    total = track_service.execute_query(f"SELECT COUNT(*) AS n FROM read_parquet('{path}') {where}", params)[0]["n"]
     rows = track_service.execute_query(
         f"""SELECT cluster_id, rna_type, chrom, "start", "end", size, genes
             FROM read_parquet('{path}')
             {where}
-            ORDER BY chrom, start
-            LIMIT 5000""",
+            ORDER BY chrom, start, cluster_id
+            LIMIT {CLUSTER_LIMIT}""",
         params,
     )
     for row in rows:
         genes = row.get("genes") or ""
         row["genes"] = genes.split(",") if isinstance(genes, str) and genes else []
-    return rows
+    return RNAClusterResponse(total=total, returned=len(rows), truncated=total > len(rows), clusters=rows)
 
 @router.get("/relationships", response_model=HostGuestResponse)
 def get_relationships(

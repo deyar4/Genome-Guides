@@ -60,5 +60,14 @@ def test_gene_lookup(client):
 def test_spacing_reports_the_gap_interval(client):
     # G1 ends at 200, G2 starts at 500: the gap is [200, 500), length 300
     r = client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c1"})
-    assert r.json() == [{"chrom": "c1", "gene_id_1": "G1", "gene_id_2": "G2", "start": 200, "end": 500, "distance": 300}]
-    assert client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c2"}).json() == []
+    assert r.json() == {"total": 1, "returned": 1, "truncated": False, "items": [
+        {"chrom": "c1", "gene_id_1": "G1", "gene_id_2": "G2", "start": 200, "end": 500, "distance": 300}]}
+    assert client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c2"}).json() == {
+        "total": 0, "returned": 0, "truncated": False, "items": []}
+
+
+def test_spacing_reports_truncation(client, monkeypatch):
+    import app.api.endpoints.genes as genes
+    monkeypatch.setattr(genes, "SPACING_LIMIT", 0)
+    r = client.get("/api/v1/genes/spacing", params={"build": "synth", "chrom": "c1"}).json()
+    assert (r["total"], r["returned"], r["truncated"]) == (1, 0, True)

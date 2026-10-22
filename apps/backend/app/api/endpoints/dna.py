@@ -261,8 +261,7 @@ def get_telomeres(
     if path is None:
         return []
     rows = track_service.execute_query(
-        f"""SELECT chrom, "start" AS position, "end", '.' AS strand, 0 AS repeat_count,
-                   '' AS sequence, COALESCE(name, 'telomere') AS location, length
+        f"""SELECT chrom, "start", "end", length, COALESCE(name, 'telomere') AS source
             FROM read_parquet('{path}') ORDER BY chrom, "start" """
     )
     return rows

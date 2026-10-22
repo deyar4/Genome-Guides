@@ -26,17 +26,19 @@ export default function GeneSpacingPage() {
   const { primaryChroms } = useDNAStats();
   const [selectedChrom, setSelectedChrom] = useState<string>('chr1');
 
-  const { data: spacing, isLoading: spacingLoading } = useQuery({
+  const { data: spacingResp, isLoading: spacingLoading } = useQuery({
     queryKey: ['gene-spacing', activeGenome, selectedChrom],
     queryFn: () => genesApi.getSpacing(activeGenome, selectedChrom),
     enabled: !!selectedChrom,
   });
 
-  const { data: overlaps, isLoading: overlapsLoading } = useQuery({
+  const { data: overlapsResp, isLoading: overlapsLoading } = useQuery({
     queryKey: ['gene-overlaps', activeGenome, selectedChrom],
     queryFn: () => genesApi.getOverlaps(activeGenome, selectedChrom),
     enabled: !!selectedChrom,
   });
+  const spacing = spacingResp?.items;
+  const overlaps = overlapsResp?.items;
 
   return (
     <LibraryShell 
@@ -111,7 +113,7 @@ export default function GeneSpacingPage() {
           <TabsContent value="overlaps" className="mt-0 space-y-6">
              <SectionHeader 
                title="Overlapping Genes" 
-               subtitle="Gene pairs that physically overlap on the same or opposite strands: the first 100 in alphabetical order of gene ID (the API returns at most 1,000 per chromosome), not ranked."
+               subtitle={`Gene pairs that physically overlap on the same or opposite strands: the first 100 in order of gene ID (the API returns at most 1,000 per request; total on this chromosome: ${overlapsResp ? overlapsResp.total.toLocaleString() : "..."}), not ranked.`}
              />
              <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                <Table>

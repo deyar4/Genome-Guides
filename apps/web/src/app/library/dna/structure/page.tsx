@@ -39,9 +39,9 @@ export default function DNAStructurePage() {
     return primaryChroms.map(c => {
       const isCircular = c.name.toLowerCase().includes('m');
       const ts = telomeres.data?.filter(t => t.chrom === c.name) || [];
-      // The API labels every record 't2t_telomeres' (no 5'/3' field), so the end is derived from
+      // The API has no 5'/3' field (each record is an interval of the T2T telomere BED), so the end is derived from
       // coordinates: a record starting at 0 is the 5' end, one ending at the chromosome length the 3' end.
-      const hasFive = ts.some(t => t.position <= TELOMERE_END_TOLERANCE_BP);
+      const hasFive = ts.some(t => t.start <= TELOMERE_END_TOLERANCE_BP);
       const hasThree = ts.some(t => t.end >= c.length - TELOMERE_END_TOLERANCE_BP);
       const hasCen = centromeres.data?.some(cen => {
         const cName = c.name.replace('chr', '');
