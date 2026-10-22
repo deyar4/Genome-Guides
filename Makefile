@@ -6,7 +6,9 @@ MEM_MB ?= 8192
 RUN    := mamba run -n genome-guides
 SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(CORES) --resources mem_mb=$(MEM_MB) --rerun-incomplete
 
-.PHONY: check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
+.NOTPARALLEL:
+
+.PHONY: check-fast check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -39,18 +41,24 @@ backend-dev:
 
 test:
 	$(RUN) python3 packages/pipeline/scripts/tests/test_pipeline.py
-	$(RUN) python3 -m pytest -q packages/pipeline/scripts/tests
-	cd apps/backend && $(RUN) uv run pytest
+	$(RUN) python3 -m pytest -q -rs packages/pipeline/scripts/tests
+	cd apps/backend && $(RUN) uv run pytest -rs
 
-# Everything that can be checked in a few minutes: unit tests, workflow dry run, tiny and 1 Mb satellite runs with golden
-# comparison, frontend lint+build, and the tiling check of the t2t window tracks when present.
-check: test dry-run pipeline-tiny golden web-build check-coverage
+# check-fast: no pipeline run, no tool builds (what CI can run): unit tests (skips are listed with -rs), workflow dry run,
+# frontend lint, typecheck, tests and build.
+check-fast: test dry-run web-build
+
+# check: check-fast plus the tiny and 1 Mb satellite runs with golden comparison (need seqkit, bedtools and the pinned
+# hecate build) and the tiling check of the t2t window tracks when present. Opt-in, longer: check-numbers, check-calibration.
+check: check-fast pipeline-tiny golden check-coverage
 
 dry-run:
 	$(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores 1 --dry-run --quiet -- all chrm_all t2t_all
 
 web-build:
 	$(RUN) pnpm --filter web run lint
+	$(RUN) pnpm --filter web run typecheck
+	$(RUN) pnpm --filter web run test
 	$(RUN) pnpm --filter web run build
 
 # Recomputes the numbers quoted in the logbook/specs for the CpG and gene-unit analyses; each check writes a TSV to

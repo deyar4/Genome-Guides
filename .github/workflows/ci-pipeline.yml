@@ -29,7 +29,7 @@ jobs:
         run: |
           cd apps/backend
           uv sync
-          uv run pytest --cov=app tests/
+          uv run pytest -rs --cov=app tests/
 
   frontend-ci:
     name: Frontend CI (Next.js 15 + TypeScript)
@@ -53,4 +53,6 @@ jobs:
         run: |
           pnpm install
           pnpm --filter web run lint
+          pnpm --filter web run typecheck
+          pnpm --filter web run test
           pnpm --filter web run build
