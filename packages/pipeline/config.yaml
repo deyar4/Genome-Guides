@@ -60,7 +60,8 @@ resources:
     mem_mb: 512
   lightweight:
     threads: 1
-    mem_mb: 1024
+    # Measured on t2t (make check-benchmarks): extract_assembly_gaps 1146 MB and seqkit_stats 1149 MB max RSS, above the old 1024.
+    mem_mb: 1536
   analytical:
     threads: 4
     mem_mb: 2048

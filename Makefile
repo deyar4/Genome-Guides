@@ -8,7 +8,7 @@ SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(COR
 
 .NOTPARALLEL:
 
-.PHONY: package-tracks check-fast check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
+.PHONY: check-benchmarks package-tracks check-fast check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -86,6 +86,11 @@ package-tracks:
 	git rev-parse HEAD > artifacts/package/COMMIT
 	tar -czf artifacts/package/genome-guides-tracks.tar.gz -C data -T artifacts/package/FILES -C ../artifacts/package MANIFEST.sha256 COMMIT
 	@echo "wrote artifacts/package/ (extract the tarball, then: sha256sum -c MANIFEST.sha256)"
+
+# Wall time and peak RSS per rule from benchmarks/t2t next to the declared mem_mb (needs a previous t2t run, no data files).
+check-benchmarks:
+	mkdir -p artifacts/checks
+	$(RUN) python3 packages/pipeline/scripts/checks/benchmark_table.py --bench-dir benchmarks/t2t --out artifacts/checks/benchmark_t2t.tsv
 
 check-coverage:
 	@if [ -f data/raw/t2t.fa.fai ] && [ -f data/tracks/t2t/all/gc_content.parquet ]; then \
