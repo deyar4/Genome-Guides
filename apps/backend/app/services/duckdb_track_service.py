@@ -21,8 +21,13 @@ def _finite(row):
 
 
 class DuckDBTrackService:
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "data", threads: Optional[int] = None, memory_limit: Optional[str] = None):
         self.conn = duckdb.connect(database=":memory:")
+        # Values are validated by Settings (SET takes no bound parameters).
+        if threads is not None:
+            self.conn.execute(f"SET threads = {int(threads)}")
+        if memory_limit is not None:
+            self.conn.execute(f"SET memory_limit = '{memory_limit}'")
         self._lock = threading.Lock()
         self._window_cache: Dict[str, int] = {}
         raw_path = Path(data_dir)

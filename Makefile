@@ -8,7 +8,7 @@ SMK    := $(RUN) snakemake -s packages/pipeline/workflow/Snakefile --cores $(COR
 
 .NOTPARALLEL:
 
-.PHONY: check-fast check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
+.PHONY: package-tracks check-fast check-numbers check-calibration env-create env-update unlock pipeline-tiny pipeline-satslice golden pipeline-chrm pipeline-t2t backend-dev test check check-coverage dry-run web-build clean clean-chrm clean-t2t
 
 env-create:
 	mamba env create -f environment.yml
@@ -76,6 +76,16 @@ check-numbers:
 check-calibration:
 	$(RUN) bash packages/pipeline/scripts/checks/cpg_calibration.sh
 	$(RUN) python3 packages/pipeline/scripts/checks/cpg_calibration.py --islands data/tracks/t2t/all/cpg_islands.parquet --rmsk data/raw/t2t_repeatmasker.out.gz --contigs $$(cut -f1 data/raw/t2t.fa.fai) --out artifacts/checks/cpg_calibration_t2t.tsv
+
+# Tracks (and with INCLUDE_RAW=1 the FASTA and index the sequence endpoints read) as one tarball with sha256 MANIFEST and the commit.
+package-tracks:
+	@test -d data/tracks/t2t/all || { echo "package-tracks: no data/tracks/t2t/all"; exit 1; }
+	mkdir -p artifacts/package
+	cd data && { find tracks -type f \( -name '*.parquet' -o -name 'sequence_stats.txt' \); $(if $(INCLUDE_RAW),ls raw/t2t.fa raw/t2t.fa.fai;) } | LC_ALL=C sort > ../artifacts/package/FILES
+	cd data && xargs -a ../artifacts/package/FILES sha256sum > ../artifacts/package/MANIFEST.sha256
+	git rev-parse HEAD > artifacts/package/COMMIT
+	tar -czf artifacts/package/genome-guides-tracks.tar.gz -C data -T artifacts/package/FILES -C ../artifacts/package MANIFEST.sha256 COMMIT
+	@echo "wrote artifacts/package/ (extract the tarball, then: sha256sum -c MANIFEST.sha256)"
 
 check-coverage:
 	@if [ -f data/raw/t2t.fa.fai ] && [ -f data/tracks/t2t/all/gc_content.parquet ]; then \

@@ -54,6 +54,7 @@ target/
 # Secrets and local environment
 .env
 .env.*
+!.env.example
 
 # Pinned third-party binaries (built by the workflow, D32)
 tools/

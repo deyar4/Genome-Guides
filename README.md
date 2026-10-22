@@ -1,8 +1,10 @@
 # Genome-Guides
 
 Genome-Guides is a Snakemake pipeline and web application for human-reference
-genome analysis. It produces sequence-complexity, mappability, entropy,
-repeat, gene, RNA, and protein tracks for browser and API access.
+genome analysis. It derives sequence-based tracks and statistics from
+T2T-CHM13v2.0 (GC content and skew, Shannon entropy of base composition, a model-based cross-entropy rate from the lab tool
+hecate-bwt, CpG islands, tandem repeats, k-mers, RepeatMasker records, gene, RNA and protein tables) and serves them for
+browser and API access. Every track states its definition in the web app (Genome Browser, "Definitions").
 
 ## Repository layout
 
@@ -112,13 +114,31 @@ pnpm --filter web dev
 The frontend expects the backend API configuration defined in the web
 application's environment and API client files.
 
+## Deployment
+
+The backend reads precomputed Parquet tracks and is configured through environment variables (`.env.example`):
+
+| Variable | Meaning |
+| --- | --- |
+| `DATA_DIR` | directory containing `tracks/<build>/all/*.parquet`; the sequence endpoints also need `raw/<build>.fa` and `.fai` (about 3 GB for T2T) |
+| `CORS_ORIGINS` | comma-separated origins allowed to call the API; default `*` is for development only |
+| `DUCKDB_THREADS`, `DUCKDB_MEMORY_LIMIT` | optional limits for small hosts, e.g. `4` and `4GB` |
+| `NEXT_PUBLIC_API_URL` | URL the browser uses to reach the API; compiled into the web build, so it is a build argument |
+
+`make package-tracks` writes `artifacts/package/genome-guides-tracks.tar.gz` with a sha256 `MANIFEST` and the commit (tracks only;
+add `INCLUDE_RAW=1` for the FASTA). `deploy/backend.Dockerfile`, `deploy/web.Dockerfile` and `docker-compose.yml` run both
+services (`docker compose up --build`, tracks mounted read-only from `TRACKS_DIR`). The images have not been built in this
+repository's CI yet (UNVERIFIED); the target hosting (Docker or VM) is not confirmed.
+
 ## Validation
 
-Run everything that needs no long run:
-
 ```bash
-make check
+make check-fast   # unit tests (skips are listed), workflow dry run, web lint + typecheck + vitest + build; no pipeline run
+make check        # check-fast + tiny and 1 Mb satellite runs with golden comparison + tiling check (needs seqkit, bedtools, hecate build)
 ```
+
+Longer, opt-in checks that recompute quoted numbers (need the full T2T tracks): `make check-numbers`, `make check-calibration`.
+`make` may be aliased to `-j12` locally; the Makefile serializes prerequisites (`.NOTPARALLEL`).
 
 Run only the backend tests:
 

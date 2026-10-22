@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
     # CORS middleware to allow the frontend to access the API
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origin_list,
         allow_credentials=False,  # no cookies or auth are used; "*" with credentials is invalid (audit 05, P10)
         allow_methods=["*"],
         allow_headers=["*"],
