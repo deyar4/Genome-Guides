@@ -328,59 +328,6 @@ def get_overlaps(
     """, params)
 
 
-def _correlation(sample: list[list[float]], interpretation: str = ""):
-    if len(sample) < 2:
-        return {"r_value": 0, "p_value": None, "n": len(sample), "interpretation": interpretation, "sample": sample}
-    import statistics
-    xs, ys = zip(*sample)
-    mx, my = statistics.mean(xs), statistics.mean(ys)
-    denom = (sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys)) ** 0.5
-    r = sum((x - mx) * (y - my) for x, y in sample) / denom if denom else 0
-    return {"r_value": r, "p_value": None, "n": len(sample), "interpretation": interpretation, "sample": sample}
-
-
-@router.get("/stats/correlations/exon-size")
-def get_exon_size_correlation(build: str = Query(...), track_service: DuckDBTrackService = Depends(get_track_service)):
-    architecture = _track_path(track_service, build, "gene_architecture.parquet")
-    models = _track_path(track_service, build, "gene_models.parquet")
-    rows = track_service.execute_query(f"""
-        SELECT a.exon_count, m.end_pos - m.start_pos AS gene_length
-        FROM read_parquet('{architecture}') a
-        JOIN read_parquet('{models}') m ON a.gene_id = m.gene_id
-        ORDER BY m.gene_id
-        LIMIT 5000
-    """)
-    sample = [[float(r["exon_count"]), float(r["gene_length"])] for r in rows]
-    return _correlation(sample, "Transcript exon count is correlated with the enclosing gene span.")
-
-
-@router.get("/stats/correlations/density-size")
-def get_density_size_correlation(build: str = Query(...), track_service: DuckDBTrackService = Depends(get_track_service)):
-    path = _track_path(track_service, build, "gene_models.parquet")
-    rows = track_service.execute_query(f"""
-        SELECT CAST(FLOOR(start_pos / 1000000) * 1000000 AS BIGINT) AS bin,
-               COUNT(*) AS density, AVG(end_pos - start_pos) AS size
-        FROM read_parquet('{path}') GROUP BY 1 ORDER BY 1 LIMIT 5000
-    """)
-    sample = [[float(r["density"]), float(r["size"])] for r in rows]
-    return _correlation(sample)
-
-
-@router.get("/stats/correlations/utr-mrna")
-def get_utr_mrna_correlation(build: str = Query(...), track_service: DuckDBTrackService = Depends(get_track_service)):
-    path = _track_path(track_service, build, "gene_architecture.parquet")
-    rows = track_service.execute_query(f"""
-        SELECT exon_bases AS mrna_length, utr5_bases, utr3_bases
-        FROM read_parquet('{path}') LIMIT 5000
-    """)
-    sample_5 = [[float(r["utr5_bases"] or 0), float(r["mrna_length"] or 0)] for r in rows]
-    sample_3 = [[float(r["utr3_bases"] or 0), float(r["mrna_length"] or 0)] for r in rows]
-    return {
-        "utr_5prime_correlation": _correlation(sample_5, "5' UTR bases and transcript exonic length."),
-        "utr_3prime_correlation": _correlation(sample_3, "3' UTR bases and transcript exonic length."),
-    }
-
-
 @router.get("/cpg-association")
 def get_cpg_association(
     build: str = Query(...),
