@@ -11,7 +11,9 @@ COPY apps/web apps/web
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1
-RUN pnpm --filter web run build
+RUN pnpm --filter web run build && chown -R node:node apps/web/.next
+WORKDIR /srv/apps/web
 USER node
 EXPOSE 3000
-CMD ["pnpm", "--filter", "web", "exec", "next", "start", "-p", "3000"]
+# next is started directly: pnpm exec would try to write into the root-owned node_modules
+CMD ["node_modules/.bin/next", "start", "-p", "3000"]
