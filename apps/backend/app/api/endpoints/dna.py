@@ -158,12 +158,8 @@ def get_dna_summary(
 
     nuclear = _section([r for r in counts if not _is_mito(r["name"])])
     mito = _section([r for r in counts if _is_mito(r["name"])])
-    if nuclear is None:
-        # no per-window counts: legacy estimate from the stats file (A=T, G=C assumed; counts are approximate)
-        gc_count = int(total_length * (gc_pct / 100))
-        at_count = total_length - gc_count
-        nuclear = GenomeSection(a=at_count // 2, t=at_count // 2, g=gc_count // 2, c=gc_count // 2,
-                                n=int(row.get('sum_n', 0)), gc_content=gc_pct)
+    # nuclear is None without per-window counts: the base counts are then unknown and are reported as missing
+    # (the former fallback assumed A=T and G=C and invented them).
 
     gene_count = protein_coding = None
     models = _track_path(track_service, build, "gene_models.parquet")

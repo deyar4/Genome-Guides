@@ -23,7 +23,7 @@ export interface GenomeSection {
 
 export interface DNAStats {
   assembly: AssemblyStats;
-  nuclear_composition: GenomeSection;
+  nuclear_composition: GenomeSection | null;
   mitochondrial_composition: GenomeSection | null;
   gene_count?: number;
   protein_coding_count?: number;

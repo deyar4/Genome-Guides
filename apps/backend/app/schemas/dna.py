@@ -24,7 +24,7 @@ class GenomeSection(BaseModel):
 
 class DNAStats(BaseModel):
     assembly: AssemblyStats
-    nuclear_composition: GenomeSection
+    nuclear_composition: Optional[GenomeSection] = None  # None: no per-window counts for this build
     mitochondrial_composition: Optional[GenomeSection] = None
     gene_count: Optional[int] = None
     protein_coding_count: Optional[int] = None
