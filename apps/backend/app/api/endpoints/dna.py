@@ -78,49 +78,107 @@ def _read_sequence(track_service: DuckDBTrackService, build: str, chrom: str, st
             position += take
     return "".join(chunks).upper()
 
+def _is_mito(name: str) -> bool:
+    return name.lower() in ("chrm", "mt")
+
+
+def _contig_counts(track_service: DuckDBTrackService, build: str) -> list[dict]:
+    """Exact per-contig A/C/G/T/N counts, summed from the 1 kb windows of the gc_content track."""
+    path = _track_path(track_service, build, "gc_content.parquet")
+    if not path.exists():
+        return []
+    return track_service.execute_query(f"""
+        SELECT contig AS name, CAST(SUM(a_count) AS BIGINT) AS a, CAST(SUM(c_count) AS BIGINT) AS c,
+               CAST(SUM(g_count) AS BIGINT) AS g, CAST(SUM(t_count) AS BIGINT) AS t,
+               CAST(SUM(n_count) AS BIGINT) AS n
+        FROM read_parquet('{path}') GROUP BY contig
+    """)
+
+
+def _section(rows: list[dict]) -> GenomeSection | None:
+    """Sum of base counts over rows. gc_content = 100 (G+C) / (A+C+G+T), N excluded (same as GC_PCT_SQL)."""
+    if not rows:
+        return None
+    a, c, g, t, n = (sum(int(r[k]) for r in rows) for k in "acgtn")
+    acgt = a + c + g + t
+    return GenomeSection(a=a, c=c, g=g, t=t, n=n, gc_content=100.0 * (g + c) / acgt if acgt else 0.0)
+
+
+def _length_stats(lengths: list[int]) -> dict:
+    """N50/N90 = length L of the contig at which the cumulative sum of lengths, sorted descending, first reaches
+    50 % / 90 % of the total; L50/L90 = number of contigs up to and including it."""
+    ordered = sorted(lengths, reverse=True)
+    total = sum(ordered)
+
+    def nx(fraction: float) -> tuple[int, int]:
+        running = 0
+        for count, length in enumerate(ordered, 1):
+            running += length
+            if running * 100 >= total * fraction:
+                return length, count
+        return 0, 0
+
+    n = len(ordered)
+    mid = n // 2
+    median = float(ordered[mid]) if n % 2 else (ordered[mid - 1] + ordered[mid]) / 2.0
+    n90, l90 = nx(90)
+    return {"n90": n90, "l90": l90, "min_len": ordered[-1], "max_len": ordered[0],
+            "mean_length": total / n, "median_length": median}
+
+
 @router.get("/stats/summary", response_model=DNAStats)
 def get_dna_summary(
     build: str = Query(..., description="Genome build (e.g. t2t, chrm)"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
-    import os
     stats_file = track_service.data_dir / "tracks" / build / "all" / "sequence_stats.txt"
     if not stats_file.exists():
         raise HTTPException(status_code=404, detail="Stats file not found")
-        
-    query = f"SELECT * FROM read_csv('{stats_file}', header=True, sep='\t')"
-    res = track_service.execute_query(query)
-    
+
+    res = track_service.execute_query(f"SELECT * FROM read_csv('{stats_file}', header=True, sep='\t')")
     if not res:
         raise HTTPException(status_code=404, detail="No stats available")
-        
+
     row = res[0]
     total_length = int(row.get('sum_len', 0))
     gc_pct = float(row.get('GC(%)', 0))
-    
+
+    counts = _contig_counts(track_service, build)
+    extra = {}
+    if counts:
+        extra = _length_stats([int(r["a"] + r["c"] + r["g"] + r["t"] + r["n"]) for r in counts])
     assembly = AssemblyStats(
         total_length=total_length,
         contig_count=int(row.get('num_seqs', 0)),
         n50=int(row.get('N50', 0)),
         l50=int(row.get('L50', row.get('N50_num', 0))),
-        gc_content=gc_pct
+        gc_content=gc_pct,
+        **extra,
     )
-    
-    # Estimate base counts from gc_pct
-    gc_count = int(total_length * (gc_pct / 100))
-    at_count = total_length - gc_count
-    
-    nuclear = GenomeSection(
-        a=at_count // 2,
-        t=at_count // 2,
-        g=gc_count // 2,
-        c=gc_count // 2,
-        n=int(row.get('sum_n', 0)),
-        gc_content=gc_pct
-    )
+
+    nuclear = _section([r for r in counts if not _is_mito(r["name"])])
+    mito = _section([r for r in counts if _is_mito(r["name"])])
+    if nuclear is None:
+        # no per-window counts: legacy estimate from the stats file (A=T, G=C assumed; counts are approximate)
+        gc_count = int(total_length * (gc_pct / 100))
+        at_count = total_length - gc_count
+        nuclear = GenomeSection(a=at_count // 2, t=at_count // 2, g=gc_count // 2, c=gc_count // 2,
+                                n=int(row.get('sum_n', 0)), gc_content=gc_pct)
+
+    gene_count = protein_coding = None
+    models = _track_path(track_service, build, "gene_models.parquet")
+    if models.exists():
+        g = track_service.execute_query(f"""
+            SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE biotype = 'protein_coding') AS pc
+            FROM read_parquet('{models}')
+        """)[0]
+        gene_count, protein_coding = int(g["n"]), int(g["pc"])
     return DNAStats(
         assembly=assembly,
-        nuclear_composition=nuclear
+        nuclear_composition=nuclear,
+        mitochondrial_composition=mito,
+        gene_count=gene_count,
+        protein_coding_count=protein_coding,
     )
 
 @router.get("/stats/chromosomes", response_model=ChromosomeListResponse)
@@ -132,7 +190,13 @@ def get_chromosomes(
         path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
         query = f"SELECT contig as name, MAX(end_pos) as length, {GC_PCT_SQL} as gc_content, {GC_SKEW_SQL} as gc_skew FROM read_parquet('{path}') GROUP BY contig"
         res = track_service.execute_query(query)
-        
+
+        ssr_counts = None
+        hits = _track_path(track_service, build, "ssr_hits.parquet")
+        if hits.exists():
+            ssr_counts = {r["chrom"]: int(r["n"]) for r in track_service.execute_query(
+                f"SELECT chrom, COUNT(*) AS n FROM read_parquet('{hits}') GROUP BY chrom")}
+
         chroms = []
         for row in res:
             name = row.get('name', '')
@@ -141,9 +205,9 @@ def get_chromosomes(
                 length=int(row.get('length', 0)),
                 gc_content=_opt(row.get('gc_content')),
                 gc_skew=_opt(row.get('gc_skew')),
-                is_mitochondrial=name.lower() in ["chrm", "mt"],
-                ssr_count=0,
-                dinucleotides={"AA": 0}
+                is_mitochondrial=_is_mito(name),
+                # None = no SSR track for this build; 0 = track exists and the contig has no hits
+                ssr_count=None if ssr_counts is None else ssr_counts.get(name, 0),
             ))
         return ChromosomeListResponse(count=len(chroms), chromosomes=chroms)
     except FileNotFoundError:
@@ -158,21 +222,29 @@ def get_dinucleotides(
         path = track_service.data_dir / "tracks" / build / "all" / "dinucleotide_frequencies.parquet"
         res = track_service.execute_query(f"SELECT * FROM read_parquet('{path}')")
         
+        counts = _contig_counts(track_service, build)
+        sec = _section(counts)
+        acgt = (sec.a + sec.c + sec.g + sec.t) if sec else 0
+        # ACGT frequencies over the whole assembly, N excluded; None-equivalent (empty) when the counts are absent
+        base_freq = {b: getattr(sec, b.lower()) / acgt for b in "ACGT"} if acgt else {}
         dinucs = []
         total = 0
         for row in res:
+            pair = row.get('dinucleotide', '')
             dinucs.append(DinucleotideStats(
-                pair=row.get('dinucleotide', ''),
+                pair=pair,
                 observed_count=int(row.get('count', 0)),
                 observed_freq=float(row.get('frequency_pct', 0)) / 100.0,
-                expected_freq=float(row.get('frequency_pct', 0)) / 100.0 / max(1.0, float(row.get('odds_ratio', 1.0))),
+                # expected under independence: f(x) f(y) from the genome base frequencies
+                expected_freq=(base_freq[pair[:1]] * base_freq[pair[1:]] if base_freq
+                              else float(row.get('frequency_pct', 0)) / 100.0 / max(1.0, float(row.get('odds_ratio', 1.0)))),
                 oe_ratio=float(row.get('odds_ratio', 0))
             ))
             total += int(row.get('count', 0))
             
         return GenomeDinucleotides(
             total_dinucleotides=total,
-            base_frequencies={"A": 0.25, "C": 0.25, "G": 0.25, "T": 0.25},
+            base_frequencies=base_freq,
             dinucleotides=dinucs
         )
     except duckdb.IOException:

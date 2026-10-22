@@ -35,8 +35,7 @@ export interface Chromosome {
   gc_content: number; // backend may send null only for an all-N contig (none in T2T)
   gc_skew: number | null;
   is_mitochondrial: boolean;
-  ssr_count: number;
-  dinucleotides: Record<string, number>;
+  ssr_count: number | null; // null = no SSR track for this build
 }
 
 export interface ChromosomeListResponse {

@@ -35,8 +35,7 @@ class Chromosome(BaseModel):
     gc_content: Optional[float] = None
     gc_skew: Optional[float] = None
     is_mitochondrial: bool
-    ssr_count: int
-    dinucleotides: Dict[str, int]
+    ssr_count: Optional[int] = None
 
 class ChromosomeListResponse(BaseModel):
     count: int
