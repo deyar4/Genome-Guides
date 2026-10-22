@@ -31,3 +31,9 @@ export const CHART_PALETTE = [
   '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', 
   '#06b6d4', '#f97316', '#d946ef', '#6366f1', '#14b8a6'
 ];
+
+/**
+ * A telomere record counts as an end cap when it starts within this many bp of position 0 (5' end)
+ * or ends within this many bp of the chromosome length (3' end). 0 = exact match.
+ */
+export const TELOMERE_END_TOLERANCE_BP = 0;
