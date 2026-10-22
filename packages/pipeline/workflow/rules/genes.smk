@@ -82,7 +82,6 @@ rule parse_splice_and_ncrna:
         fai="data/raw/{genome}.fa.fai"
     output:
         ncrna_census="data/tracks/{genome}/all/ncrna_detailed_census.parquet",
-        gene_isoforms="data/tracks/{genome}/all/gene_isoform_counts.parquet",
         splice_sites="data/tracks/{genome}/all/splice_sites.parquet",
         splice_consensus="data/tracks/{genome}/all/splice_site_consensus.parquet",
         rna_clusters="data/tracks/{genome}/all/rna_clusters.parquet",

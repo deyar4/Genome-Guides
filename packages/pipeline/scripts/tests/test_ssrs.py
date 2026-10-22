@@ -30,7 +30,7 @@ def make_fasta(path, seed):
 
 def hits(tmp_path, fasta, chunk, tag):
     out = tmp_path / tag
-    extract(str(fasta), str(out), window_size=1000, chunk_bases=chunk)
+    extract(str(fasta), str(out), chunk_bases=chunk)
     t = pq.read_table(out / "ssr_hits.parquet").to_pylist()
     return sorted((r["chrom"], r["start"], r["end"], r["motif"], r["period"]) for r in t)
 

@@ -39,10 +39,6 @@ def analyze_proteins(input_path: str, out_dir: str):
             ("repeat_len", pa.uint32()), ("start_pos", pa.uint32()), ("end_pos", pa.uint32()),
         ]),
         "lengths": pa.schema([("protein_id", pa.string()), ("length", pa.uint32())]),
-        "composition": pa.schema([
-            ("protein_id", pa.string()), ("amino_acid", pa.string()),
-            ("count", pa.uint32()), ("frequency_pct", pa.float32()),
-        ]),
         "richness": pa.schema([
             ("protein_id", pa.string()), ("length", pa.uint32()),
             ("distinct_amino_acids", pa.uint8()), ("dominant_amino_acid", pa.string()),
@@ -74,10 +70,6 @@ def analyze_proteins(input_path: str, out_dir: str):
             float(max(counts.values(), default=0) / max(1, length) * 100.0),
             float(entropy),
         ))
-        for aa, count in counts.items():
-            batch_rows["composition"].append(
-                (protein_id, aa, count, float(count / max(1, length) * 100.0))
-            )
         for aa in AMINO_ACIDS:
             total_aa_counts[aa] += counts[aa]
 

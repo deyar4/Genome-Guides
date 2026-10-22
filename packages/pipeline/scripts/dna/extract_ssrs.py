@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find tandem repeats (periods 1-6) and emit hits, summaries, density and descriptive coverage (D41).
+"""Find tandem repeats (periods 1-6) and emit hits, summaries and descriptive coverage (D41).
 
 ssr_coverage.parquet is descriptive only: observed SSR bases and counts per period relative to the ACGT bases of the
 assembly, with N and other symbols counted separately. It carries no null model and supports no over- or under-representation
@@ -79,14 +79,13 @@ def safe_cut(hits, size):
     return max(cut, 0)
 
 
-def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
-    if window_size < 1 or chunk_bases < 1:
-        raise ValueError("window size and chunk size must be positive")
+def extract(fasta, out_dir, chunk_bases=4_000_000):
+    if chunk_bases < 1:
+        raise ValueError("chunk size must be positive")
 
     chrom_lengths = {}
     period_counts = Counter()
     period_bases = Counter()
-    density_counts = Counter()
     total_ssr_bases = 0
     union_ssr_bases = 0
     cover_end = 0
@@ -123,7 +122,6 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
             batch.append(hit)
             period_counts[hit["period"]] += 1
             period_bases[hit["period"]] += hit["length"]
-            density_counts[(chrom, (hit["start"] // window_size) * window_size)] += 1
             total_ssr_bases += hit["length"]
             union_ssr_bases += max(0, hit["end"] - max(hit["start"], cover_end))
             cover_end = max(cover_end, hit["end"])
@@ -170,11 +168,6 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
             if period_counts[period] else 0.0,
         })
 
-    density = [{
-        "chrom": chrom, "start": start, "end": min(chrom_lengths.get(chrom, start + window_size), start + window_size),
-        "count": count,
-    } for (chrom, start), count in sorted(density_counts.items())]
-
     genome_length = sum(chrom_lengths.values())
     acgt_bases = base_counts["acgt"]
     coverage = []
@@ -194,9 +187,6 @@ def extract(fasta, out_dir, window_size=1_000_000, chunk_bases=4_000_000):
         "period": pa.uint8(), "name": pa.string(), "count": pa.uint64(),
         "total_length": pa.uint64(), "avg_repeat_count": pa.float64(),
     })
-    write(out / "ssr_density.parquet", density, {
-        "chrom": pa.string(), "start": pa.uint64(), "end": pa.uint64(), "count": pa.uint64(),
-    })
     write(out / "ssr_coverage.parquet", coverage, {
         "period": pa.uint8(), "name": pa.string(), "count": pa.uint64(), "observed_bases": pa.uint64(),
         "genome_bases": pa.uint64(), "acgt_bases": pa.uint64(), "n_bases": pa.uint64(), "other_bases": pa.uint64(),
@@ -209,9 +199,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-f", "--fasta", required=True)
     parser.add_argument("-o", "--out-dir", required=True)
-    parser.add_argument("-w", "--window-size", type=int, default=1_000_000)
     parser.add_argument("--chunk-bases", type=int, default=4_000_000)
     add_resource_args(parser)
     args = parser.parse_args()
     chunk_bases = min(args.chunk_bases, max(100_000, effective_memory_mb(args.memory_mb) * 250))
-    extract(args.fasta, args.out_dir, args.window_size, chunk_bases)
+    extract(args.fasta, args.out_dir, chunk_bases)

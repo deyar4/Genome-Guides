@@ -116,8 +116,6 @@ tracks:
     sha256:
       linux-x86_64: "561c4cea9566088b5a0166e29b9d7c7944e44ad1c8c9a94a0e369cd4ad8b3c5d"
   ssr:
-    # 1 Mb bins support genome-wide enrichment comparisons without dense output.
-    window_size: 1000000
     # Four million bases bounds regex working memory on 16 GB laptops.
     chunk_bases: 4000000
   # Isochore-like classes: thresholds 37/41/46/53 (% GC) are hardcoded in scripts/dna/extract_isochores.py and applied to

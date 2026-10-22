@@ -252,10 +252,6 @@ def extract(gtf, fasta, out_dir):
     write(out / "ncrna_detailed_census.parquet", [
         {"ncrna_subclass": k, "count": v} for k, v in sorted(ncrna.items())
     ], {"ncrna_subclass": pa.string(), "count": pa.uint64()})
-    iso = Counter(t[4] for t in transcripts.values())
-    write(out / "gene_isoform_counts.parquet", [
-        {"gene_name": k, "isoform_count": v} for k, v in sorted(iso.items())
-    ], {"gene_name": pa.string(), "isoform_count": pa.uint64()})
     write(out / "rna_clusters.parquet", cluster_rows, {
         "cluster_id": pa.string(), "rna_type": pa.string(), "chrom": pa.string(),
         "start": pa.uint64(), "end": pa.uint64(), "size": pa.uint32(), "genes": pa.string()
