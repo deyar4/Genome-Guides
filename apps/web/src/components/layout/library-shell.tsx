@@ -5,6 +5,7 @@ import { SidebarNav } from './sidebar-nav';
 import { Menu, Moon, Server, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { CommandMenu } from './command-menu';
+import { QueryErrorBanner } from './query-error-banner';
 import { useQuery } from '@tanstack/react-query';
 import { systemApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -84,6 +85,7 @@ export function LibraryShell({ children, title, subtitle }: LibraryShellProps) {
                 {subtitle && <p className="text-base sm:text-lg text-muted-foreground mt-2 max-w-3xl">{subtitle}</p>}
               </div>
             )}
+            <QueryErrorBanner />
             {children}
           </div>
         </main>
