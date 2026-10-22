@@ -74,7 +74,7 @@ export default function GeneSpacingPage() {
           <TabsContent value="spacing" className="mt-0 space-y-6">
              <SectionHeader 
                title="Gene Deserts & Clusters" 
-               subtitle="The 100 largest gaps between adjacent genes on the selected chromosome (the API returns at most the 1,000 largest per chromosome), sorted by distance."
+               subtitle={`The 100 largest gaps between adjacent genes on the selected chromosome, sorted by distance (${spacingResp ? spacingResp.total.toLocaleString() : "..."} gaps on this chromosome; the API returns at most the 1,000 largest).`}
              />
              <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
                <Table>
