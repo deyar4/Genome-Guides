@@ -174,3 +174,27 @@ def test_metadata_threshold_agrees_with_pipeline_config(client):
 
 def test_isochores_requires_chrom(client):
     assert client.get("/api/v1/dna/isochores", params={"build": "synth"}).status_code == 422
+
+
+def test_every_track_the_browser_requests_has_a_definition(client):
+    """D17: each track served to the genome browser states its definition, window and units."""
+    import re
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[3] / "apps/web/src/hooks/useGenomeData.ts").read_text()
+    requested = set(re.findall(r'fetchTrack\("(\w+)"\)', src))
+    assert len(requested) >= 9, requested
+    meta = client.get("/api/v1/tracks/metadata").json()
+    assert requested <= set(meta), sorted(requested - set(meta))
+    for name in requested:
+        assert "window_bp" in meta[name] and meta[name]["columns"], name
+        assert all(isinstance(t, str) and t for t in meta[name]["columns"].values()), name
+
+
+def test_100kb_windows_in_metadata_match_the_pipeline_scripts():
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3] / "packages/pipeline/scripts/genes"
+    from app.core.track_meta import TRACK_METADATA
+    for script in ("extract_gene_models.py", "extract_repeatmasker.py"):
+        assert re.search(r"window_size = 100000\b", (root / script).read_text()), script
+    assert TRACK_METADATA["gene_density"]["window_bp"] == TRACK_METADATA["repeatmasker_density"]["window_bp"] == 100000

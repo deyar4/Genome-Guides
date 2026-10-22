@@ -10,6 +10,12 @@ const TRACK_TITLES: Record<string, string> = {
   shannon_entropy: "Shannon entropy of base composition",
   hecate_mprob: "Hecate cross-entropy rate",
   cpg_islands: "CpG islands",
+  gene_density: "Gene count per 100 kb",
+  repeatmasker_density: "RepeatMasker records per 100 kb",
+  gene_models: "Gene models",
+  repeatmasker_families: "RepeatMasker records",
+  assembly_gaps: "Assembly gaps",
+  homopolymer_genomic_tracts: "Homopolymer tracts (>= 10 bases)",
 };
 
 /** Exact definition, units, log base and window of each track, as served by /tracks/metadata (D17). */
@@ -42,7 +48,7 @@ export function TrackDefinitionsDialog() {
             <section key={name}>
               <h4 className="text-sm font-bold">{TRACK_TITLES[name] ?? name}</h4>
               <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
-                {name} · base window {meta.window_bp.toLocaleString()} bp
+                {name} · {meta.window_bp === null ? "interval track (not binned)" : `base window ${meta.window_bp.toLocaleString()} bp`}
               </p>
               <dl className="space-y-2">
                 {Object.entries(meta.columns).map(([col, text]) => (
@@ -52,6 +58,7 @@ export function TrackDefinitionsDialog() {
                   </div>
                 ))}
               </dl>
+              {meta.source && <p className="text-[10px] text-muted-foreground mt-2">Produced by {meta.source}</p>}
             </section>
           ))}
           {Array.isArray(binning) && binning.length > 0 && (

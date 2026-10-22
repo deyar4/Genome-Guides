@@ -438,8 +438,9 @@ export interface BuildResponse {
 }
 
 export interface TrackMetadataEntry {
-  window_bp: number;
+  window_bp: number | null; // null = interval track (not binned)
   columns: Record<string, string>;
+  source?: string;
 }
 
 /** /tracks/metadata: per-track definitions plus the shared binning notes. */
