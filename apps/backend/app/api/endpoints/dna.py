@@ -522,18 +522,18 @@ def get_ssr_coverage(
 @router.get("/isochores", response_model=List[IsochoreStats])
 def get_isochores(
     build: str = Query(...),
-    chrom: Optional[str] = Query(None),
+    chrom: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    # chrom is required: the whole-genome response is 1.67 M rows (~170 MB, 6.9 s).
     path = _read_track(track_service, build, "isochores.parquet")
     if path is None:
         return []
-    where = "WHERE chrom = ?" if chrom else ""
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", gc_content, isochore_class
-            FROM read_parquet('{path}') {where}
-            ORDER BY chrom, "start" """,
-        [chrom] if chrom else [],
+            FROM read_parquet('{path}') WHERE chrom = ?
+            ORDER BY "start" """,
+        [chrom],
     )
 
 @router.get("/sequence/window")

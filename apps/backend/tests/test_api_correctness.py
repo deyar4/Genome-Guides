@@ -170,3 +170,7 @@ def test_metadata_threshold_agrees_with_pipeline_config(client):
     text = client.get("/api/v1/tracks/metadata").json()["shannon_entropy"]["columns"]["avg_shannon_entropy"]
     assert f"= {threshold} with the current config" in text
     assert "binning" in client.get("/api/v1/tracks/metadata").json()
+
+
+def test_isochores_requires_chrom(client):
+    assert client.get("/api/v1/dna/isochores", params={"build": "synth"}).status_code == 422

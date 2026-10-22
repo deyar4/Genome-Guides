@@ -103,7 +103,7 @@ export const dnaApi = {
     fetcher<{ start: number; end: number; gc_content: number; gc_skew: number | null }[]>("/dna/sequence/window", { build, chrom, ...params }),
   getGCSkew: (build: string, chrom: string, window_size = 10000) => 
     fetcher<{ start: number; gc_skew: number }[]> (`/dna/stats/${chrom}/gc-skew`, { build, window_size }),
-  getIsochores: (build: string, chrom?: string) => fetcher<IsochoreStats[]>("/dna/isochores", { build, ...(chrom ? { chrom } : {}) }),
+  getIsochores: (build: string, chrom: string) => fetcher<IsochoreStats[]>("/dna/isochores", { build, chrom }),
   getCPGIslands: (build: string, opts: { chrom?: string; strict?: boolean; limit?: number } = {}) =>
     fetcher<CpGIslandResponse>("/dna/cpg-islands", { build, ...(opts.chrom ? { chrom: opts.chrom } : {}), ...(opts.strict ? { strict: true } : {}), ...(opts.limit ? { limit: opts.limit } : {}) }),
   getGaps: (build: string, chrom?: string) => fetcher<AssemblyGapHit[]>("/dna/gaps", { build, ...(chrom ? { chrom } : {}) }),
