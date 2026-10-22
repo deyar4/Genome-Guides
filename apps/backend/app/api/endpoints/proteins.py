@@ -12,6 +12,8 @@ def get_size_stats(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Protein length summary (residues) from protein_lengths.parquet: total_proteins, mean, median, max and min length.
+    Returns all zeros when the track is missing, which is indistinguishable from a real zero."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_lengths.parquet"
     if not path.exists():
         return ProteinStats(total_proteins=0, avg_length=0.0, median_length=0.0, max_length=0, min_length=0)
@@ -35,6 +37,8 @@ def get_composition(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Genome-wide amino acid composition from amino_acid_composition.parquet as [{amino_acid, count, percentage}] (percentage =
+    the track's frequency_pct), in file order. Returns [] if the track is empty; a missing track is handled globally as 404."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "amino_acid_composition.parquet"
         query = f"SELECT amino_acid, count, frequency_pct as percentage FROM read_parquet('{path}')"
@@ -50,6 +54,9 @@ def get_terminal_composition(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """N- and C-terminal amino acid composition from protein_terminal_bias.parquet: per amino_acid the counts and
+    percentages at each terminus and n_to_c_bias_ratio, as stored (UNVERIFIED: the terminal window length and the ratio
+    definition, see the pipeline script). Returns [] if empty; a missing track is handled globally as 404."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "protein_terminal_bias.parquet"
         query = f"SELECT amino_acid, n_terminal_count, n_terminal_pct, c_terminal_count, c_terminal_pct, n_to_c_bias_ratio FROM read_parquet('{path}')"
@@ -66,6 +73,9 @@ def get_largest(
     limit: int = Query(10, gt=0, le=100),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """The limit longest proteins from protein_lengths.parquet, by length (residues) descending then protein_id. Only protein_id
+    and length are filled; gene_id, gene_name, transcript_id, sequence and is_mitochondrial are always null because the
+    protein-to-gene mapping is unavailable (OPEN_QUESTIONS Q-protein-gene). Returns [] when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_lengths.parquet"
     if not path.exists():
         return []
@@ -95,6 +105,10 @@ def get_homopolymers(
     limit: int = Query(100, gt=0, le=5000),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Single-amino-acid tracts of at least min_length residues from protein_homopolymers.parquet as {amino_acid, start, end,
+    length, protein_id}, longest first, then protein_id and start, capped at limit with no total. start/end are the stored
+    start_pos/end_pos (UNVERIFIED: coordinate base within the protein). Returns [] if empty; a missing track is handled
+    globally as 404."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "protein_homopolymers.parquet"
         query = f"""SELECT amino_acid, start_pos as start, end_pos as end, repeat_len as length, protein_id
@@ -116,6 +130,10 @@ def get_rich(
     limit: int = Query(50, gt=0, le=1000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Proteins whose dominant amino acid is aa (case-insensitive) with dominant_frequency_pct >= threshold (percent, default
+    15), from protein_richness.parquet, ordered by that percentage then length, capped at limit. Includes length,
+    distinct_amino_acids and shannon_entropy as stored (log base UNVERIFIED here); gene_id, gene_name, transcript_id,
+    sequence, is_mitochondrial are always null (OPEN_QUESTIONS Q-protein-gene). Returns [] when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_richness.parquet"
     if not path.exists():
         return []

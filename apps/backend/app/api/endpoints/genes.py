@@ -15,6 +15,10 @@ def get_summary(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Gene counts per biotype from gene_biotype_census.parquet (total_genes is their sum) and the mean exon_count over the rows of
+    gene_architecture.parquet as avg_exons_per_transcript (UNVERIFIED: whether those rows are per transcript).
+    Returns zeros and an empty list when the census track is missing; 0.0 for the mean when the architecture track is
+    missing. A gene id shared by separate loci counts as one gene unit (OPEN_QUESTIONS Q-gene-units)."""
     biotype_file = track_service.data_dir / "tracks" / build / "all" / "gene_biotype_census.parquet"
     if not biotype_file.exists():
         return GeneSummary(total_genes=0, biotype_counts=[], avg_exons_per_transcript=0)
@@ -43,6 +47,9 @@ def get_chromosome_stats(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Per contig of gene_models.parquet: gene_count and density = gene_count / (MAX end_pos - MIN start_pos of its genes) * 1e6,
+    i.e. genes per Mb of the span between the first and last gene, not of the contig length. Ordered by contig.
+    Returns [] when the track is missing. Gene units follow OPEN_QUESTIONS Q-gene-units."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
         return []
@@ -71,6 +78,8 @@ def get_biotypes(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Gene count per biotype as [{biotype, count}] read unchanged from gene_biotype_census.parquet (no ordering applied).
+    Returns [] when the track is missing. Gene units and biotype assignment: see OPEN_QUESTIONS Q-gene-units."""
     biotype_file = track_service.data_dir / "tracks" / build / "all" / "gene_biotype_census.parquet"
     if not biotype_file.exists():
         return []
@@ -90,6 +99,9 @@ def get_largest(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """The 50 longest genes of gene_models.parquet, ranked by length = end_pos - start_pos (value, in bp) descending, with
+    gene_id, gene_name, biotype, chrom, start, end and strand. Ties are in unspecified order. Returns [] when the track is
+    missing. A gene_models row can merge several loci with one gene_id (OPEN_QUESTIONS Q-gene-units), which inflates length."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
         return []
@@ -123,6 +135,9 @@ def get_most_exons(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """The 50 genes with the highest exon count: gene_architecture.parquet joined to gene_models.parquet on (gene_id, contig),
+    value = MAX exon_count over the gene's architecture rows (UNVERIFIED: that this is the per-transcript maximum).
+    Returns [] when either track is missing. Gene units: OPEN_QUESTIONS Q-gene-units."""
     architecture_file = track_service.data_dir / "tracks" / build / "all" / "gene_architecture.parquet"
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not architecture_file.exists() or not models_file.exists():
@@ -160,6 +175,9 @@ def search_genes(
     q: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Case-insensitive substring search (ILIKE %q%) of q on gene_name and gene_id in gene_models.parquet. At most 50 rows,
+    without ordering or total, as {gene_id, gene_name, biotype, chrom, start, end}. Returns [] when the track is missing
+    or nothing matches."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
         return []
@@ -229,6 +247,9 @@ def get_region(
     end: int = Query(..., gt=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Genes of gene_models.parquet on chrom overlapping [start, end) (gene.start < end and gene.end > start), ordered by
+    start, at most 500, as a bare list {gene_id, gene_name, biotype, chrom, start, end, strand} (no truncation flag).
+    Coordinates are the track's start_pos/end_pos. 404 when the track is missing; unknown contig gives []."""
     path = _track_path(track_service, build, "gene_models.parquet")
     return track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig AS chrom,
@@ -247,6 +268,9 @@ def get_density(
     bin_size: int = Query(1_000_000, gt=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Number of genes per bin of bin_size bp on one contig, as [{start, count}] ordered by start. A gene is counted in the bin
+    containing its start_pos (floor(start_pos / bin_size) * bin_size); empty bins are absent. Strand and gene length are
+    ignored. 404 when the track is missing. Gene units: OPEN_QUESTIONS Q-gene-units."""
     path = _track_path(track_service, build, "gene_models.parquet")
     return track_service.execute_query(f"""
         SELECT CAST(FLOOR(start_pos / ?) * ? AS BIGINT) AS start,
@@ -263,6 +287,9 @@ def get_size_stats(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Mean, median, min and max of length = end_pos - start_pos in bp for genes (gene_models.parquet), exons (exons.parquet)
+    and introns (introns.parquet), as {genes, exons, introns}. A missing track gives all four values as 0.0, which is
+    indistinguishable from a real zero. Gene lengths are affected by OPEN_QUESTIONS Q-gene-units."""
     def feature_stats(name: str):
         path = track_service.data_dir / "tracks" / build / "all" / name
         if not path.exists():
@@ -293,6 +320,10 @@ def get_spacing(
     chrom: str | None = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Intergenic gaps from gene_spacing.parquet, largest first (distance = intergenic_dist, bp), optionally for one chrom, as
+    {total, returned, truncated, items} capped at 1000 items. Each item gives the gap as [start, end) with end = start of
+    gene 2 and start = end - distance (half-open, 0-based per code comment), plus gene_id_1 and gene_id_2. The covered-span
+    definition is D39. 404 when a track is missing."""
     path = _track_path(track_service, build, "gene_spacing.parquet")
     models = _track_path(track_service, build, "gene_models.parquet")
     where = "WHERE s.contig = ?" if chrom else ""
@@ -322,6 +353,9 @@ def get_overlaps(
     chrom: str | None = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Overlapping gene pairs from gene_overlaps.parquet, optionally for one chrom, ordered by chrom and gene ids, as {total,
+    returned, truncated, items} capped at 1000 items. Each item has overlap_type ('same_strand' or 'opposite_strand'),
+    overlap_len (bp, as stored) and contained (true when the track's contained = 1). 404 when the track is missing."""
     path = _track_path(track_service, build, "gene_overlaps.parquet")
     where = "WHERE contig = ?" if chrom else ""
     params = [chrom] if chrom else []
@@ -344,6 +378,10 @@ def get_cpg_association(
     promoter_distance: int = Query(2000, gt=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Counts genes with at least one CpG island within promoter_distance bp of the gene's start_pos, overall and per biotype
+    (gene_models.parquet joined to cpg_islands.parquet on contig; island.start <= start_pos + d and island.end >= start_pos - d).
+    Not strand-aware: start_pos is used for minus-strand genes too, where transcription starts at end_pos
+    (OPEN_QUESTIONS Q-cpg point 3). Returns {with_cpg, without_cpg, total, percentage, by_biotype, note}; 404 when a track is missing."""
     genes = _track_path(track_service, build, "gene_models.parquet")
     cpg = _track_path(track_service, build, "cpg_islands.parquet")
     rows = track_service.execute_query(f"""
@@ -386,6 +424,10 @@ def get_gene(
     chrom: str | None = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """One gene by gene_id or gene_name (exact match) from gene_models.parquet with its transcripts (each with exons and, if
+    utrs.parquet exists, utrs) and the architecture rows of gene_architecture.parquet. Genes present on several contigs
+    (e.g. PAR) return the first copy by contig and start, or the copy on chrom, and list all other copies in other_copies.
+    404 when no match (or none on chrom). Gene unit and first-transcript biotype/strand: OPEN_QUESTIONS Q-gene-units."""
     path = _track_path(track_service, build, "gene_models.parquet")
     rows = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig AS chrom,

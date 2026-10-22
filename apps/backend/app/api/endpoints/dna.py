@@ -131,6 +131,11 @@ def get_dna_summary(
     build: str = Query(..., description="Genome build (e.g. t2t, chrm)"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Assembly summary for a build: total length, contig count, N50/L50 and GC % from sequence_stats.txt, plus N90/L90,
+    min/max/mean/median contig length computed from the per-contig base counts of gc_content.parquet (extra fields are
+    absent when that track is missing). nuclear_composition / mitochondrial_composition (A/C/G/T/N counts, GC % over ACGT
+    only, N excluded; contigs named chrM or MT are mitochondrial) are null when per-window counts are missing.
+    gene_count / protein_coding_count are null without gene_models.parquet. 404 when sequence_stats.txt is missing."""
     stats_file = track_service.data_dir / "tracks" / build / "all" / "sequence_stats.txt"
     if not stats_file.exists():
         raise HTTPException(status_code=404, detail="Stats file not found")
@@ -182,6 +187,10 @@ def get_chromosomes(
     build: str = Query(..., description="Genome build"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """One row per contig of the gc_content track: length (MAX end_pos of its windows), GC % and GC skew % (both from summed
+    A/C/G/T counts, N excluded; null when the denominator is 0), is_mitochondrial (name chrM or MT) and ssr_count.
+    ssr_count is null when the build has no ssr_hits track and 0 when the track exists but the contig has no hits.
+    Returns {count, chromosomes}; 404 when the GC content track is missing."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
         query = f"SELECT contig as name, MAX(end_pos) as length, {GC_PCT_SQL} as gc_content, {GC_SKEW_SQL} as gc_skew FROM read_parquet('{path}') GROUP BY contig"
@@ -214,6 +223,10 @@ def get_dinucleotides(
     build: str = Query(..., description="Genome build"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Genome-wide dinucleotide table from dinucleotide_frequencies.parquet: observed count, observed_freq (frequency_pct / 100)
+    and oe_ratio (the stored odds_ratio column). expected_freq = f(x) f(y) from genome-wide A/C/G/T frequencies (N excluded)
+    summed over the gc_content track; it is null, and base_frequencies empty, when those counts are missing.
+    total_dinucleotides is the sum of the observed counts. 404 when the track is missing."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "dinucleotide_frequencies.parquet"
         res = track_service.execute_query(f"SELECT * FROM read_parquet('{path}')")
@@ -252,6 +265,9 @@ def get_telomeres(
     build: str = Query(..., description="Genome build"),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Telomeric repeat intervals from telomeres.parquet, ordered by chrom and start, as {chrom, start, end, length, source}
+    (source is the track's name column, 'telomere' when null). Coordinates are returned exactly as stored in the track.
+    Returns [] when the build has no telomeres track."""
     path = _read_track(track_service, build, "telomeres.parquet")
     if path is None:
         return []
@@ -266,6 +282,9 @@ def get_centromeres(
     build: str = Query(..., description="Genome build"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Centromere regions from centromeres.parquet, ordered by chrom and start, as {chrom, start, end, length, gc_content,
+    sequence_sample}. Coordinates are returned as stored in the track; gc_content and sequence_sample are always null
+    (not computed by this route). Returns [] when the build has no centromeres track."""
     path = _read_track(track_service, build, "centromeres.parquet")
     if path is None:
         return []
@@ -281,6 +300,8 @@ def get_assembly_stats(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Assembly part of /stats/summary (total length, contig count, N50, L50, GC %, and N90/L90/min/max/mean/median contig
+    length when the gc_content track exists). Same source files and 404 behaviour as /stats/summary."""
     return get_dna_summary(build, track_service).assembly
 
 
@@ -292,6 +313,9 @@ def get_sequence(
     end: int = Query(..., gt=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Returns the plain uppercase sequence of chrom for [start, end) as a JSON string, read from raw/<build>.fa using its .fai
+    index (soft-masking is lost, N kept). start is 0-based, end is exclusive. 422 unless 0 <= start < end <= contig length;
+    404 when the FASTA or the chromosome is missing; 503 when the .fai index is missing."""
     return _read_sequence(track_service, build, chrom, start, end)
 
 
@@ -302,6 +326,10 @@ def get_gc_skew(
     window_size: int = Query(10000, gt=0, le=100_000_000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """GC skew in percent, 100 (G-C) / (G+C), of one contig in bins of window_size bp, as [{start, gc_skew}] ordered by start.
+    Bins are exact aggregates of the 1 kb gc_content windows (N excluded); gc_skew is null when G+C = 0. start is the
+    0-based bin start. 422 when window_size is not a multiple of the base window; 404 when the track is missing;
+    an unknown contig gives []."""
     path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"GC content track not found for build '{build}'")
@@ -323,6 +351,9 @@ def get_gaps(
     chrom: str = Query(..., description="Chromosome"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Assembly gaps (runs of N) of one contig from assembly_gaps.parquet as {chrom, start, end, length, gap_type}, where
+    length = end - start and the stored start_pos/end_pos are returned unchanged. chrom is required. Unknown contig gives [];
+    a missing track file is handled globally as 404."""
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "assembly_gaps.parquet"
         res = track_service.execute_query(f"SELECT * FROM read_parquet('{path}') WHERE contig = ?", [chrom])
@@ -352,6 +383,10 @@ def get_cpg_islands(
     offset: int = Query(0, ge=0),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """CpG islands from cpg_islands.parquet, filtered by chrom, by overlap with [start, end) (island.end > start and
+    island.start < end, 0-based half-open) and by strict (strict = 1: length >= 500, GC >= 55 %, obs/exp >= 0.65).
+    Returns {total, returned, truncated, islands}, paged by limit/offset in file (FASTA index) order. gc_content is a percent.
+    422 when start >= end. Island positions are only reliable to the 200 bp window grid (OPEN_QUESTIONS Q-cpg)."""
     if start is not None and end is not None and start >= end:
         raise HTTPException(status_code=422, detail="start must be smaller than end")
     try:
@@ -398,6 +433,10 @@ def get_kmers(
     end: Optional[int] = Query(None, description="Ignored: k-mer counts are genome-wide (kept for client compatibility)"),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Most frequent k-mers (k = 3 or 6) from kmers_<k>mer.parquet, ordered by count, top_n rows, with count and frequency
+    (frequency_pct column of the track). Counts are genome-wide: chrom, start and end are ignored (kept only for client
+    compatibility). total_kmers is the sum of counts, unique_kmers the number of rows. 422 for other k; a missing track is
+    handled globally as 404."""
     if k not in (3, 6):
         raise HTTPException(status_code=422, detail="k must be 3 or 6")
     try:
@@ -425,6 +464,10 @@ def get_ssr(
     offset: int = Query(0, ge=0),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Simple sequence repeat hits of one contig from ssr_hits.parquet, ordered by start, end. Optional filters: overlap with
+    [start, end) (hit.end > start and hit.start < end), min_repeats (repeat_count >=) and period (1-6). Paged by
+    limit/offset; returns a bare list with no total. Coordinates are returned as stored in the track.
+    Returns [] when the build has no ssr_hits track."""
     path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
         return []
@@ -519,7 +562,10 @@ def get_isochores(
     chrom: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
-    # chrom is required: the whole-genome response is 1.67 M rows (~170 MB, 6.9 s).
+    """Isochore segments of one contig from isochores.parquet as {chrom, start, end, gc_content, isochore_class}, ordered by
+    start; the segments are runs of 1 kb windows in the same GC class (class thresholds 37/41/46/53 % GC, config comment and
+    scripts/dna/extract_isochores.py): a GC-class run, not a literature isochore. chrom is required because the whole-genome response is about 1.67 M rows. Returns [] when the track is
+    missing or the contig is unknown."""
     path = _read_track(track_service, build, "isochores.parquet")
     if path is None:
         return []
@@ -540,6 +586,10 @@ def get_sequence_window(
     limit: int = Query(1000, gt=0, le=5000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """GC content and GC skew, both in percent, of one contig in bins of step bp, as [{start, end, gc_content, gc_skew}] ordered by
+    start (0-based, end = start + step, last bin not clipped to the contig). Covers [start, end) (default end = start +
+    step * limit) and returns at most limit bins. Exact aggregates of the 1 kb gc_content windows, N excluded, null when the
+    denominator is 0. 422 when step is not a multiple of the base window; 404 when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "gc_content.parquet"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"GC content track not found for build '{build}'")

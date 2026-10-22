@@ -19,6 +19,9 @@ def get_summary(
     build: str = Query(...),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Non-coding RNA overview: overall_stats {biotype_counts per ncrna_subclass from ncrna_detailed_census.parquet, cluster_counts
+    per rna_type, total_nc_rna, total_clusters} and cluster_summaries rows from rna_cluster_summary.parquet. Each part is
+    empty when its track is missing; no 404 is raised."""
     base = track_service.data_dir / "tracks" / build / "all"
     census_path = base / "ncrna_detailed_census.parquet"
     cluster_summary_path = base / "rna_cluster_summary.parquet"
@@ -67,6 +70,9 @@ def get_clusters(
     chrom: Optional[str] = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """RNA gene clusters from rna_clusters.parquet filtered by rna_type and/or chrom, ordered by chrom, start, cluster_id.
+    Returns {total, returned, truncated, clusters}, capped at 5000. genes is the comma-separated stored string split into a
+    list. Coordinates are returned as stored in the track. Empty response (not 404) when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "rna_clusters.parquet"
     if not path.exists():
         return RNAClusterResponse(total=0, returned=0, truncated=False, clusters=[])
@@ -129,6 +135,9 @@ def get_splice_consensus(
     site_type: Optional[str] = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    """Splice-site consensus from splice_site_consensus.parquet as [{site_type, consensus_seq, pwm, total_sites}], optionally for
+    one site_type, ordered by site_type. pwm maps each of A, C, G, T to a list of per-position values as stored
+    (UNVERIFIED: whether they are frequencies or counts). Returns [] when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "splice_site_consensus.parquet"
     if not path.exists():
         return []
@@ -157,6 +166,10 @@ def get_splice_sites(
     limit: int = Query(1000, gt=0, le=5000),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
+    """Annotated intron junction records from splice_sites.parquet as {chrom, start, end, transcript_id, gene_id, strand,
+    junction_number, donor_seq, acceptor_seq, is_canonical}, where start/end are the stored intron_start/intron_end.
+    site_type 'donor' or 'acceptor' keeps rows with that sequence non-null (other values are ignored); chrom filters the
+    contig. Ordered by chrom and start, bare list capped at limit with no total. Returns [] when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "splice_sites.parquet"
     if not path.exists():
         return []
