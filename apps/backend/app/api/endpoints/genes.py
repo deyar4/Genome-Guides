@@ -373,19 +373,25 @@ def get_cpg_association(
 def get_gene(
     gene_id: str,
     build: str = Query(...),
+    chrom: str | None = Query(None),
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     path = _track_path(track_service, build, "gene_models.parquet")
+    contig_sql = "AND contig = ?" if chrom else ""
     rows = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig AS chrom,
                start_pos AS start, end_pos AS end, strand
         FROM read_parquet('{path}')
-        WHERE gene_id = ? OR gene_name = ?
-        LIMIT 1
-    """, [gene_id, gene_id])
+        WHERE (gene_id = ? OR gene_name = ?) {contig_sql}
+        ORDER BY contig, start_pos, gene_id
+    """, [gene_id, gene_id] + ([chrom] if chrom else []))
     if not rows:
         raise HTTPException(status_code=404, detail=f"Gene '{gene_id}' not found")
     gene = rows[0]
+    # PAR genes exist once per contig: the first copy (contig, start order) is returned and the others are listed,
+    # never dropped silently. Pass chrom to select one.
+    other_copies = [{"gene_id": r["gene_id"], "chrom": r["chrom"], "start": r["start"], "end": r["end"]}
+                    for r in rows[1:]]
     gene_key = gene.get("gene_id", gene_id)
     base = track_service.data_dir / "tracks" / build / "all"
     transcripts_path = base / "transcripts.parquet"
@@ -399,9 +405,9 @@ def get_gene(
             SELECT transcript_id, gene_id, biotype,
                    start_pos AS start, end_pos AS end, strand
             FROM read_parquet('{transcripts_path}')
-            WHERE gene_id = ?
+            WHERE gene_id = ? AND contig = ?
             ORDER BY start_pos
-        """, [gene_key])
+        """, [gene_key, gene["chrom"]])
         for tx in tx_rows:
             tx_id = tx["transcript_id"]
             tx["exons"] = []
@@ -427,7 +433,7 @@ def get_gene(
     if architecture_path.exists():
         architecture = track_service.execute_query(f"""
             SELECT * FROM read_parquet('{architecture_path}')
-            WHERE gene_id = ?
+            WHERE gene_id = ? AND contig = ?
             ORDER BY transcript_id
-        """, [gene_key])
-    return {**gene, "transcripts": transcripts, "architecture": architecture}
+        """, [gene_key, gene["chrom"]])
+    return {**gene, "other_copies": other_copies, "transcripts": transcripts, "architecture": architecture}
