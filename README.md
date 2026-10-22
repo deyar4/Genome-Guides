@@ -127,8 +127,9 @@ The backend reads precomputed Parquet tracks and is configured through environme
 
 `make package-tracks` writes `artifacts/package/genome-guides-tracks.tar.gz` with a sha256 `MANIFEST` and the commit (tracks only;
 add `INCLUDE_RAW=1` for the FASTA). `deploy/backend.Dockerfile`, `deploy/web.Dockerfile` and `docker-compose.yml` run both
-services (`docker compose up --build`, tracks mounted read-only from `TRACKS_DIR`). The images have not been built in this
-repository's CI yet (UNVERIFIED); the target hosting (Docker or VM) is not confirmed.
+services (`docker compose up --build`, tracks mounted read-only from `TRACKS_DIR`). Both images were built and run locally with the
+real t2t tracks (2026-10-22: backend healthy as non-root, web 200, CORS header follows `CORS_ORIGINS`); CI does not build them. Set
+`BACKEND_PORT`/`WEB_PORT` if 8000/3000 are taken. The target hosting (Docker or VM) is not confirmed.
 
 ## Validation
 
