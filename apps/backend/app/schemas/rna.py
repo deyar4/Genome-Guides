@@ -22,6 +22,9 @@ class RNASummaryOverallStats(BaseModel):
     cluster_counts: Dict[str, int]
     total_nc_rna: int
     total_clusters: int
+    # biotype_counts counts transcripts (feature "transcript"/"mRNA") whose id is not NM_/XM_, by gene name or
+    # attribute text (extract_rna_tracks.rna_biotype); it is not a count of genes.
+    census_unit: str = "transcripts"
 
 class RNASummary(BaseModel):
     overall_stats: RNASummaryOverallStats

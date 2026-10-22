@@ -303,6 +303,7 @@ export interface RNASummary {
     cluster_counts: Record<string, number>;
     total_nc_rna: number;
     total_clusters: number;
+    census_unit: string;
   };
   cluster_summaries: RNAClusterSummary[];
 }

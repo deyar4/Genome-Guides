@@ -46,7 +46,7 @@ export default function RnaOverview() {
           <GenomicMetricCard 
             label="Non-coding RNA records"
             value={stats?.total_nc_rna ? formatNumber(stats.total_nc_rna) : '...'}
-            description="Records in the ncRNA census (unit not documented by the API; larger than the 37,360 non-coding genes of the Biotype Census, so probably transcripts)."
+            description="Transcripts without an NM_/XM_ id (the census unit is transcripts, not genes), classified by gene name or attribute text."
             color="#ec4899"
           />
           <GenomicMetricCard 
