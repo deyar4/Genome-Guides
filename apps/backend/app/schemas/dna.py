@@ -85,6 +85,15 @@ class CpGIslandHit(BaseModel):
     length: int
     gc_content: float
     obs_exp_ratio: float
+    cpg_count: int
+    n_windows: int
+    strict: bool
+
+class CpGIslandResponse(BaseModel):
+    total: int  # all islands matching the filters, before limit/offset
+    returned: int
+    truncated: bool  # True iff offset + returned < total
+    islands: List[CpGIslandHit]
 
 class KmerFrequency(BaseModel):
     kmer: str

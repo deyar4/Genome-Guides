@@ -78,7 +78,11 @@ export default function DNAStructurePage() {
 
   const cpgIslands = useQuery({
     queryKey: ['cpg-islands', activeGenome],
-    queryFn: () => dnaApi.getCPGIslands(activeGenome),
+    queryFn: () => dnaApi.getCPGIslands(activeGenome, { limit: 1 }),
+  });
+  const cpgStrict = useQuery({
+    queryKey: ['cpg-islands-strict', activeGenome],
+    queryFn: () => dnaApi.getCPGIslands(activeGenome, { strict: true, limit: 1 }),
   });
 
   // 3. Render
@@ -245,8 +249,8 @@ export default function DNAStructurePage() {
            </GenomicChartContainer>
 
            <GenomicChartContainer
-             title="CpG Island Records"
-             subtitle="CpG records from the pipeline track (200 bp windows with GC content and observed/expected CpG)."
+             title="CpG Islands"
+             subtitle="Merged runs of adjacent 200 bp windows with GC > 50 % and observed/expected CpG > 0.6 (the whole run must satisfy both). Grid-anchored: boundaries are only determined to the 200 bp grid."
              isLoading={cpgIslands.isLoading}
              isError={cpgIslands.isError}
              onRetry={() => cpgIslands.refetch()}
@@ -255,12 +259,12 @@ export default function DNAStructurePage() {
               <div className="flex flex-col h-full">
                  <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 dark:bg-zinc-900/50 rounded-xl border border-dashed border-slate-200 dark:border-zinc-800">
                     <div className="text-4xl font-mono font-bold text-slate-900 dark:text-zinc-100 mb-2">
-                       {cpgIslands.data ? `${cpgIslands.data.length.toLocaleString()}${cpgIslands.data.length >= 1000 ? '+' : ''}` : '...'}
+                       {cpgIslands.data ? cpgIslands.data.total.toLocaleString() : '...'}
                     </div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CpG records returned</div>
-                    {cpgIslands.data && cpgIslands.data.length >= 1000 && (
-                      <p className="text-[10px] text-amber-600 mt-2 max-w-[260px]">The API returns at most 1,000 records (200 bp each, adjacent ones not merged), so the genome-wide total is not shown.</p>
-                    )}
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CpG islands (genome-wide)</div>
+                    <p className="text-[10px] text-slate-500 mt-2 max-w-[300px]">
+                      {cpgStrict.data ? `${cpgStrict.data.total.toLocaleString()} also satisfy the stricter criteria (length >= 500 bp, GC >= 55 %, observed/expected >= 0.65).` : ''}
+                    </p>
                  </div>
               </div>
            </GenomicChartContainer>

@@ -6,38 +6,28 @@ rule compute_cpg_islands:
         fai="data/raw/{genome}.fa.fai"
     output:
         parquet="data/tracks/{genome}/all/cpg_islands.parquet",
-        windows=temp("data/interim/{genome}/cpg_windows.bed"),
-        nuc=temp("data/interim/{genome}/cpg_nuc.bed"),
-        locs=temp("data/interim/{genome}/cpg_locs.bed"),
-        mapped=temp("data/interim/{genome}/cpg_mapped.bed"),
-        tsv=temp("data/interim/{genome}/cpg_islands.tsv")
+        summary="data/tracks/{genome}/all/cpg_islands_summary.tsv",
+        meta="data/tracks/{genome}/all/cpg_islands_meta.json"
+    params:
+        cfg=config["tracks"]["cpg_islands"]
     log:
         "logs/{genome}/compute_cpg_islands.log"
     benchmark:
         "benchmarks/{genome}/compute_cpg_islands.tsv"
-    threads: config["resources"]["analytical"]["threads"]
+    threads: 1
     resources:
-        mem_mb=config["resources"]["analytical"]["mem_mb"]
+        mem_mb=config["resources"]["lightweight"]["mem_mb"]
     shell:
         """
         exec > {log} 2>&1
-        mkdir -p data/tracks/{wildcards.genome}/all data/interim/{wildcards.genome}
-        bedtools makewindows -g {input.fai} -w 200 -s 200 | sort -k1,1 -k2,2n > {output.windows}
-        bedtools nuc -fi {input.fasta} -bed {output.windows} | grep -v "^#" > {output.nuc}
-        seqkit locate -i -P -p "CG" --bed {input.fasta} 2>/dev/null | sort -k1,1 -k2,2n > {output.locs}
-        if [ ! -s {output.locs} ]; then
-            awk 'BEGIN {{OFS="\\t"}} {{print $0, 0}}' {output.nuc}
-        else
-            bedtools map -a {output.nuc} -b {output.locs} -c 4 -o count -null 0
-        fi > {output.mapped}
-        awk 'BEGIN {{OFS="\\t"}} {{
-            gc_pct = $5 * 100.0;
-            expected = ($7 * $8) / $12;
-            ratio = (expected > 0) ? ($13 / expected) : 0.0;
-            is_island = (gc_pct >= 50.0 && ratio >= 0.60 && $13 >= 4.0) ? 1 : 0;
-            if (is_island == 1) print $1, $2, $3, gc_pct, ratio, $13, is_island
-        }}' {output.mapped} > {output.tsv}
-        python3 packages/pipeline/scripts/common/duckdb_to_parquet.py -i {output.tsv} -o {output.parquet} -t cpg_islands
+        mkdir -p data/tracks/{wildcards.genome}/all
+        python3 packages/pipeline/scripts/dna/extract_cpg_islands.py \
+            --fasta {input.fasta} --fai {input.fai} \
+            --out-parquet {output.parquet} --out-summary {output.summary} --out-meta {output.meta} \
+            --window {params.cfg[window]} --min-gc {params.cfg[min_gc]} --min-oe {params.cfg[min_oe]} \
+            --min-length {params.cfg[min_length]} --strict-min-length {params.cfg[strict_min_length]} \
+            --strict-min-gc {params.cfg[strict_min_gc]} --strict-min-oe {params.cfg[strict_min_oe]} \
+            --block-bases {params.cfg[block_bases]}
         """
 
 rule compute_ssrs:

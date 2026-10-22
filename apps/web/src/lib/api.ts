@@ -30,7 +30,7 @@ import {
   ProteinBase,
   HomopolymerTract,
   IsochoreStats,
-  CpGIslandHit,
+  CpGIslandResponse,
   AssemblyGapHit,
   KmerResponse,
   SystemHealth,
@@ -104,7 +104,8 @@ export const dnaApi = {
   getGCSkew: (build: string, chrom: string, window_size = 10000) => 
     fetcher<{ start: number; gc_skew: number }[]> (`/dna/stats/${chrom}/gc-skew`, { build, window_size }),
   getIsochores: (build: string, chrom?: string) => fetcher<IsochoreStats[]>("/dna/isochores", { build, ...(chrom ? { chrom } : {}) }),
-  getCPGIslands: (build: string, chrom?: string) => fetcher<CpGIslandHit[]>("/dna/cpg-islands", { build, ...(chrom ? { chrom } : {}) }),
+  getCPGIslands: (build: string, opts: { chrom?: string; strict?: boolean; limit?: number } = {}) =>
+    fetcher<CpGIslandResponse>("/dna/cpg-islands", { build, ...(opts.chrom ? { chrom: opts.chrom } : {}), ...(opts.strict ? { strict: true } : {}), ...(opts.limit ? { limit: opts.limit } : {}) }),
   getGaps: (build: string, chrom?: string) => fetcher<AssemblyGapHit[]>("/dna/gaps", { build, ...(chrom ? { chrom } : {}) }),
   getKmers: (build: string, chrom: string, params: { k?: number, start?: number, end?: number, top_n?: number, normalize?: boolean } = {}) => 
     fetcher<KmerResponse>(`/dna/stats/${chrom}/kmers`, { build, ...params }),

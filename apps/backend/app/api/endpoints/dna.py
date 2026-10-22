@@ -9,7 +9,7 @@ from app.schemas.dna import (
     DNAStats, AssemblyStats, GenomeSection,
     ChromosomeListResponse, Chromosome,
     GenomeDinucleotides, DinucleotideStats,
-    TelomereHit, CentromereRegion, AssemblyGapHit, CpGIslandHit,
+    TelomereHit, CentromereRegion, AssemblyGapHit, CpGIslandHit, CpGIslandResponse,
     KmerResponse, KmerFrequency, SSRSummary, SSRHit, SSRDensityWindow,
     IsochoreStats
 )
@@ -347,32 +347,48 @@ def get_gaps(
     except (duckdb.Error, OSError, ValueError) as exc:
         raise HTTPException(status_code=500, detail="Failed to query assembly gaps") from exc
 
-@router.get("/cpg-islands", response_model=List[CpGIslandHit])
+@router.get("/cpg-islands", response_model=CpGIslandResponse)
 def get_cpg_islands(
     build: str = Query(..., description="Genome build"),
     chrom: Optional[str] = Query(None, description="Chromosome"),
+    start: Optional[int] = Query(None, ge=0, description="Overlap query start (0-based, half-open)"),
+    end: Optional[int] = Query(None, gt=0, description="Overlap query end (0-based, half-open)"),
+    strict: bool = Query(False, description="Only islands with strict = 1 (length >= 500, GC >= 55 %, obs/exp >= 0.65)"),
+    limit: int = Query(1000, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
+    if start is not None and end is not None and start >= end:
+        raise HTTPException(status_code=422, detail="start must be smaller than end")
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "cpg_islands.parquet"
-        query = f"SELECT * FROM read_parquet('{path}') WHERE is_cpg_island = 1"
-        params = []
+        where, params = ["TRUE"], []
         if chrom:
-            query += " AND contig = ?"
+            where.append("contig = ?")
             params.append(chrom)
-        query += " LIMIT 1000"
-        res = track_service.execute_query(query, params)
-        islands = []
-        for r in res:
-            islands.append(CpGIslandHit(
-                chrom=r.get("contig", ""),
-                start=int(r.get("start_pos", 0)),
-                end=int(r.get("end_pos", 0)),
-                length=int(r.get("end_pos", 0)) - int(r.get("start_pos", 0)),
-                gc_content=float(r.get("gc_pct", 0)),
-                obs_exp_ratio=float(r.get("obs_exp_ratio", 0))
-            ))
-        return islands
+        if start is not None:  # half-open overlap: island.end > start
+            where.append("end_pos > ?")
+            params.append(start)
+        if end is not None:  # island.start < end
+            where.append("start_pos < ?")
+            params.append(end)
+        if strict:
+            where.append("strict = 1")
+        clause = " AND ".join(where)
+        total = int(track_service.execute_query(
+            f"SELECT COUNT(*) AS n FROM read_parquet('{path}') WHERE {clause}", params)[0]["n"])
+        # contig order of the FASTA index is not stored in the track; natural order = file order of the parquet,
+        # which the pipeline writes in .fai order, so order by row position then start
+        res = track_service.execute_query(
+            f"SELECT * FROM read_parquet('{path}', file_row_number = true) WHERE {clause} "
+            "ORDER BY file_row_number LIMIT ? OFFSET ?", params + [limit, offset])
+        islands = [CpGIslandHit(
+            chrom=r["contig"], start=int(r["start_pos"]), end=int(r["end_pos"]), length=int(r["length"]),
+            gc_content=float(r["gc_pct"]), obs_exp_ratio=float(r["obs_exp_ratio"]), cpg_count=int(r["cpg_count"]),
+            n_windows=int(r["n_windows"]), strict=bool(r["strict"]),
+        ) for r in res]
+        return CpGIslandResponse(total=total, returned=len(islands), truncated=offset + len(islands) < total,
+                                 islands=islands)
     except duckdb.IOException:
         raise  # handled globally as 404 (no data for this build)
     except (duckdb.Error, OSError, ValueError) as exc:

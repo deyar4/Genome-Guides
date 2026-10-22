@@ -60,4 +60,17 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
             "min_mean_entropy / max_mean_entropy": "Smallest and largest per-window value inside the bin.",
         },
     },
+    "cpg_islands": {
+        "window_bp": 200,
+        "columns": {
+            "definition": (
+                "Maximal runs of adjacent 200 bp tiled windows (grid starts at 0, partial last window and windows with N excluded) "
+                "that each have GC > 50 % and obs/exp CpG > 0.6, kept iff the whole run again satisfies both and length >= 200. "
+                "Grid-anchored: boundaries are only determined to the 200 bp grid. Spec docs/analyses/01_cpg_islands.md."
+            ),
+            "gc_pct": "100*(C+G)/length, percent over the island (N excluded by construction).",
+            "obs_exp_ratio": "cpg_count*length/(C*G), dimensionless; cpg_count counts CG dinucleotides fully inside [start, end).",
+            "strict": "1 iff length >= 500, gc_pct >= 55 and obs_exp_ratio >= 0.65 (inclusive bounds), evaluated on the merged island.",
+        },
+    },
 }

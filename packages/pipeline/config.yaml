@@ -53,6 +53,18 @@ resources:
     mem_mb: 8192
 
 tracks:
+  # CpG islands (spec docs/analyses/01_cpg_islands.md). min_gc (percent) and min_oe are STRICT lower bounds (classical
+  # wording: GC > 50 %, obs/exp > 0.6); the strict_min_* values are INCLUSIVE (>=). Rationals are exact, never floats.
+  cpg_islands:
+    window: 200
+    min_gc: "50"
+    min_oe: "3/5"
+    min_length: 200
+    strict_min_length: 500
+    strict_min_gc: "55"
+    strict_min_oe: "13/20"
+    # Bases read per block (memory knob, does not change results).
+    block_bases: 16000000
   # gc_content and the hecate cross-entropy track use a fixed 1000 bp grid (D31): `-W 1000` in trivial_cli.smk and `-w 1000`
   # in dna.smk. They are literals, not config, so no key here can silently disagree with the results.
   shannon_entropy:

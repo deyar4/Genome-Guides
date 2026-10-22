@@ -120,6 +120,16 @@ export interface CpGIslandHit {
   length: number;
   gc_content: number;
   obs_exp_ratio: number;
+  cpg_count: number;
+  n_windows: number;
+  strict: boolean;
+}
+
+export interface CpGIslandResponse {
+  total: number; // all matching islands, before limit/offset
+  returned: number;
+  truncated: boolean;
+  islands: CpGIslandHit[];
 }
 
 export interface AssemblyGapHit {

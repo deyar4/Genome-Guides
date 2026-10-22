@@ -375,7 +375,6 @@ def get_cpg_association(
         FROM read_parquet('{genes}') g
         LEFT JOIN read_parquet('{cpg}') c
           ON c.contig = g.contig
-         AND c.is_cpg_island = 1
          AND c.start_pos <= g.start_pos + {promoter_distance}
          AND c.end_pos >= g.start_pos - {promoter_distance}
         GROUP BY g.biotype
