@@ -49,10 +49,10 @@ def get_chromosome_stats(
 ):
     """Per contig of gene_models.parquet: gene_count and density = gene_count / (MAX end_pos - MIN start_pos of its genes) * 1e6,
     i.e. genes per Mb of the span between the first and last gene, not of the contig length. Ordered by contig.
-    Returns [] when the track is missing. Gene units follow OPEN_QUESTIONS Q-gene-units."""
+    404 when the track is missing. Gene units follow OPEN_QUESTIONS Q-gene-units."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'gene_models.parquet' not found for build '{build}'")
 
     res = track_service.execute_query(f"""
         SELECT contig, count(1) as gene_count,
@@ -79,10 +79,10 @@ def get_biotypes(
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
     """Gene count per biotype as [{biotype, count}] read unchanged from gene_biotype_census.parquet (no ordering applied).
-    Returns [] when the track is missing. Gene units and biotype assignment: see OPEN_QUESTIONS Q-gene-units."""
+    404 when the track is missing. Gene units and biotype assignment: see OPEN_QUESTIONS Q-gene-units."""
     biotype_file = track_service.data_dir / "tracks" / build / "all" / "gene_biotype_census.parquet"
     if not biotype_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'gene_biotype_census.parquet' not found for build '{build}'")
     
     res = track_service.execute_query(f"SELECT biotype, count FROM read_parquet('{biotype_file}')")
     
@@ -104,7 +104,7 @@ def get_largest(
     missing. A gene_models row can merge several loci with one gene_id (OPEN_QUESTIONS Q-gene-units), which inflates length."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'gene_models.parquet' not found for build '{build}'")
 
     res = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig, start_pos, end_pos, strand,
@@ -137,11 +137,11 @@ def get_most_exons(
 ):
     """The 50 genes with the highest exon count: gene_architecture.parquet joined to gene_models.parquet on (gene_id, contig),
     value = MAX exon_count over the gene's architecture rows (UNVERIFIED: that this is the per-transcript maximum).
-    Returns [] when either track is missing. Gene units: OPEN_QUESTIONS Q-gene-units."""
+    404 when either track is missing. Gene units: OPEN_QUESTIONS Q-gene-units."""
     architecture_file = track_service.data_dir / "tracks" / build / "all" / "gene_architecture.parquet"
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not architecture_file.exists() or not models_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Required tracks not found for build '{build}'")
 
     res = track_service.execute_query(f"""
         SELECT m.gene_id, m.gene_name, m.biotype, m.contig, m.start_pos, m.end_pos, m.strand,
@@ -176,11 +176,11 @@ def search_genes(
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
     """Case-insensitive substring search (ILIKE %q%) of q on gene_name and gene_id in gene_models.parquet. At most 50 rows,
-    without ordering or total, as {gene_id, gene_name, biotype, chrom, start, end}. Returns [] when the track is missing
+    without ordering or total, as {gene_id, gene_name, biotype, chrom, start, end}. 404 when the track is missing
     or nothing matches."""
     models_file = track_service.data_dir / "tracks" / build / "all" / "gene_models.parquet"
     if not models_file.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'gene_models.parquet' not found for build '{build}'")
 
     res = track_service.execute_query(f"""
         SELECT gene_id, gene_name, biotype, contig, start_pos, end_pos
@@ -288,12 +288,12 @@ def get_size_stats(
     track_service: DuckDBTrackService = Depends(get_track_service),
 ):
     """Mean, median, min and max of length = end_pos - start_pos in bp for genes (gene_models.parquet), exons (exons.parquet)
-    and introns (introns.parquet), as {genes, exons, introns}. A missing track gives all four values as 0.0, which is
-    indistinguishable from a real zero. Gene lengths are affected by OPEN_QUESTIONS Q-gene-units."""
+    and introns (introns.parquet), as {genes, exons, introns}. A missing track gives 404 (it used to give all four values as 0.0, which was
+    indistinguishable from a real zero). Gene lengths are affected by OPEN_QUESTIONS Q-gene-units."""
     def feature_stats(name: str):
         path = track_service.data_dir / "tracks" / build / "all" / name
         if not path.exists():
-            return {"mean": 0.0, "median": 0.0, "min": 0.0, "max": 0.0}
+            raise HTTPException(status_code=404, detail=f"Track '{name}' not found for build '{build}'")
         rows = track_service.execute_query(f"""
             SELECT AVG(end_pos - start_pos) AS mean,
                    median(end_pos - start_pos) AS median,

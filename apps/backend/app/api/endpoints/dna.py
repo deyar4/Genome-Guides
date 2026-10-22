@@ -267,10 +267,10 @@ def get_telomeres(
 ):
     """Telomeric repeat intervals from telomeres.parquet, ordered by chrom and start, as {chrom, start, end, length, source}
     (source is the track's name column, 'telomere' when null). Coordinates are returned exactly as stored in the track.
-    Returns [] when the build has no telomeres track."""
+    404 when the build has no telomeres track."""
     path = _read_track(track_service, build, "telomeres.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'telomeres.parquet' not found for build '{build}'")
     rows = track_service.execute_query(
         f"""SELECT chrom, "start", "end", length, COALESCE(name, 'telomere') AS source
             FROM read_parquet('{path}') ORDER BY chrom, "start" """
@@ -284,10 +284,10 @@ def get_centromeres(
 ):
     """Centromere regions from centromeres.parquet, ordered by chrom and start, as {chrom, start, end, length, gc_content,
     sequence_sample}. Coordinates are returned as stored in the track; gc_content and sequence_sample are always null
-    (not computed by this route). Returns [] when the build has no centromeres track."""
+    (not computed by this route). 404 when the build has no centromeres track."""
     path = _read_track(track_service, build, "centromeres.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'centromeres.parquet' not found for build '{build}'")
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", length, NULL::DOUBLE AS gc_content,
                    NULL::VARCHAR AS sequence_sample
@@ -467,10 +467,10 @@ def get_ssr(
     """Simple sequence repeat hits of one contig from ssr_hits.parquet, ordered by start, end. Optional filters: overlap with
     [start, end) (hit.end > start and hit.start < end), min_repeats (repeat_count >=) and period (1-6). Paged by
     limit/offset; returns a bare list with no total. Coordinates are returned as stored in the track.
-    Returns [] when the build has no ssr_hits track."""
+    404 when the build has no ssr_hits track."""
     path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'ssr_hits.parquet' not found for build '{build}'")
     filters, params = ["chrom = ?"], [chrom]
     if start is not None:
         filters.append('"end" > ?')
@@ -504,11 +504,11 @@ def get_ssr_summary(
     if chrom is None:
         path = _read_track(track_service, build, "ssr_summary.parquet")
         if path is None:
-            return []
+            raise HTTPException(status_code=404, detail=f"Track 'ssr_summary.parquet' not found for build '{build}'")
         return track_service.execute_query(f"SELECT * FROM read_parquet('{path}') ORDER BY period")
     path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'ssr_hits.parquet' not found for build '{build}'")
     return track_service.execute_query(
         f"""SELECT CAST(period AS INTEGER) AS period, ANY_VALUE(period_name) AS name, COUNT(*) AS count,
                    CAST(SUM(length) AS BIGINT) AS total_length,
@@ -532,7 +532,7 @@ def get_ssr_density(
     Windows without tracts are absent."""
     path = _read_track(track_service, build, "ssr_hits.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'ssr_hits.parquet' not found for build '{build}'")
     return track_service.execute_query(
         f"""SELECT chrom, CAST("start" // ? * ? AS UBIGINT) AS "start", CAST("start" // ? * ? + ? AS UBIGINT) AS "end",
                    COUNT(*) AS count
@@ -552,7 +552,7 @@ def get_ssr_coverage(
     """Descriptive SSR coverage per period (genome-wide, D41). No null model: not a measure of enrichment."""
     path = _read_track(track_service, build, "ssr_coverage.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'ssr_coverage.parquet' not found for build '{build}'")
     return track_service.execute_query(f"SELECT * FROM read_parquet('{path}') ORDER BY period")
 
 
@@ -564,11 +564,11 @@ def get_isochores(
 ):
     """Isochore segments of one contig from isochores.parquet as {chrom, start, end, gc_content, isochore_class}, ordered by
     start; the segments are runs of 1 kb windows in the same GC class (class thresholds 37/41/46/53 % GC, config comment and
-    scripts/dna/extract_isochores.py): a GC-class run, not a literature isochore. chrom is required because the whole-genome response is about 1.67 M rows. Returns [] when the track is
-    missing or the contig is unknown."""
+    scripts/dna/extract_isochores.py): a GC-class run, not a literature isochore. chrom is required because the whole-genome response is about 1.67 M rows. 404 when the track is
+    missing; [] when the contig is unknown."""
     path = _read_track(track_service, build, "isochores.parquet")
     if path is None:
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'isochores.parquet' not found for build '{build}'")
     return track_service.execute_query(
         f"""SELECT chrom, "start", "end", gc_content, isochore_class
             FROM read_parquet('{path}') WHERE chrom = ?

@@ -137,10 +137,10 @@ def get_splice_consensus(
 ):
     """Splice-site consensus from splice_site_consensus.parquet as [{site_type, consensus_seq, pwm, total_sites}], optionally for
     one site_type, ordered by site_type. pwm maps each of A, C, G, T to a list of per-position values as stored
-    (UNVERIFIED: whether they are frequencies or counts). Returns [] when the track is missing."""
+    (UNVERIFIED: whether they are frequencies or counts). 404 when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "splice_site_consensus.parquet"
     if not path.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'splice_site_consensus.parquet' not found for build '{build}'")
     where = "WHERE site_type = ?" if site_type else ""
     rows = track_service.execute_query(
         f"""SELECT site_type, consensus_seq, pwm, total_sites
@@ -169,10 +169,10 @@ def get_splice_sites(
     """Annotated intron junction records from splice_sites.parquet as {chrom, start, end, transcript_id, gene_id, strand,
     junction_number, donor_seq, acceptor_seq, is_canonical}, where start/end are the stored intron_start/intron_end.
     site_type 'donor' or 'acceptor' keeps rows with that sequence non-null (other values are ignored); chrom filters the
-    contig. Ordered by chrom and start, bare list capped at limit with no total. Returns [] when the track is missing."""
+    contig. Ordered by chrom and start, bare list capped at limit with no total. 404 when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "splice_sites.parquet"
     if not path.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'splice_sites.parquet' not found for build '{build}'")
     filters, params = [], []
     if site_type == "donor":
         filters.append("donor_seq IS NOT NULL")

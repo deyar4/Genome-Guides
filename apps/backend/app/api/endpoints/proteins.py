@@ -13,10 +13,10 @@ def get_size_stats(
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
     """Protein length summary (residues) from protein_lengths.parquet: total_proteins, mean, median, max and min length.
-    Returns all zeros when the track is missing, which is indistinguishable from a real zero."""
+    404 when the track is missing (it used to return all zeros, indistinguishable from a real zero)."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_lengths.parquet"
     if not path.exists():
-        return ProteinStats(total_proteins=0, avg_length=0.0, median_length=0.0, max_length=0, min_length=0)
+        raise HTTPException(status_code=404, detail="Track 'protein_lengths.parquet' not found for build '" + build + "'")
     rows = track_service.execute_query(f"""
         SELECT COUNT(*) AS total_proteins,
                AVG(length) AS avg_length, MEDIAN(length) AS median_length,
@@ -75,10 +75,10 @@ def get_largest(
 ):
     """The limit longest proteins from protein_lengths.parquet, by length (residues) descending then protein_id. Only protein_id
     and length are filled; gene_id, gene_name, transcript_id, sequence and is_mitochondrial are always null because the
-    protein-to-gene mapping is unavailable (OPEN_QUESTIONS Q-protein-gene). Returns [] when the track is missing."""
+    protein-to-gene mapping is unavailable (OPEN_QUESTIONS Q-protein-gene). 404 when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_lengths.parquet"
     if not path.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'protein_lengths.parquet' not found for build '{build}'")
     rows = track_service.execute_query(
         f"""SELECT protein_id, length
             FROM read_parquet('{path}')
@@ -133,10 +133,10 @@ def get_rich(
     """Proteins whose dominant amino acid is aa (case-insensitive) with dominant_frequency_pct >= threshold (percent, default
     15), from protein_richness.parquet, ordered by that percentage then length, capped at limit. Includes length,
     distinct_amino_acids and shannon_entropy as stored (log base UNVERIFIED here); gene_id, gene_name, transcript_id,
-    sequence, is_mitochondrial are always null (OPEN_QUESTIONS Q-protein-gene). Returns [] when the track is missing."""
+    sequence, is_mitochondrial are always null (OPEN_QUESTIONS Q-protein-gene). 404 when the track is missing."""
     path = track_service.data_dir / "tracks" / build / "all" / "protein_richness.parquet"
     if not path.exists():
-        return []
+        raise HTTPException(status_code=404, detail=f"Track 'protein_richness.parquet' not found for build '{build}'")
     rows = track_service.execute_query(f"""
         SELECT protein_id, length, distinct_amino_acids, dominant_amino_acid,
                dominant_frequency_pct, shannon_entropy
