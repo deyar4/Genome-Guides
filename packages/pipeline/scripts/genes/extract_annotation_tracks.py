@@ -116,9 +116,10 @@ def parse(gtf, out_dir):
                     "strand": strand, "transcript_id": tx, "gene_id": gene,
                     "gene_name": name, "biotype": biotype,
                 }
-                old = genes.get(gene)
+                # key (contig, gene_id): the same gene_id occurs on several contigs (PAR copies on chrX/chrY)
+                old = genes.get((chrom, gene))
                 if old is None:
-                    genes[gene] = {
+                    genes[(chrom, gene)] = {
                         "contig": chrom, "start_pos": start0, "end_pos": end0,
                         "strand": strand, "gene_id": gene, "gene_name": name,
                         "biotype": biotype,

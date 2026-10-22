@@ -132,7 +132,7 @@ def get_most_exons(
         SELECT m.gene_id, m.gene_name, m.biotype, m.contig, m.start_pos, m.end_pos, m.strand,
                MAX(a.exon_count) AS exon_count
         FROM read_parquet('{architecture_file}') a
-        JOIN read_parquet('{models_file}') m ON a.gene_id = m.gene_id
+        JOIN read_parquet('{models_file}') m ON a.gene_id = m.gene_id AND a.contig = m.contig
         GROUP BY m.gene_id, m.gene_name, m.biotype, m.contig, m.start_pos, m.end_pos, m.strand
         ORDER BY exon_count DESC
         LIMIT 50
@@ -274,13 +274,13 @@ def get_spacing(
     where = "WHERE s.contig = ?" if chrom else ""
     params = [chrom] if chrom else []
     # The gap is [end of the covering gene, start of gene 2) (half-open, 0-based);
-    # the parquet keeps only its length, so the start of gene 2 (unique gene_id) gives both ends.
+    # the parquet keeps only its length, so the start of gene 2 (unique per (contig, gene_id)) gives both ends.
     return track_service.execute_query(f"""
         SELECT s.contig AS chrom, s.gene1_id AS gene_id_1, s.gene2_id AS gene_id_2,
                CAST(m.start_pos AS BIGINT) - s.intergenic_dist AS start,
                CAST(m.start_pos AS BIGINT) AS end, s.intergenic_dist AS distance
         FROM read_parquet('{path}') s
-        JOIN read_parquet('{models}') m ON m.gene_id = s.gene2_id
+        JOIN read_parquet('{models}') m ON m.gene_id = s.gene2_id AND m.contig = s.contig
         {where}
         ORDER BY s.intergenic_dist DESC
         LIMIT 1000
@@ -370,8 +370,8 @@ def get_cpg_association(
     cpg = _track_path(track_service, build, "cpg_islands.parquet")
     rows = track_service.execute_query(f"""
         SELECT g.biotype,
-               COUNT(DISTINCT g.gene_id) AS total,
-               COUNT(DISTINCT CASE WHEN c.contig IS NOT NULL THEN g.gene_id END) AS with_cpg
+               COUNT(DISTINCT (g.contig, g.gene_id)) AS total,
+               COUNT(DISTINCT CASE WHEN c.contig IS NOT NULL THEN (g.contig, g.gene_id) END) AS with_cpg
         FROM read_parquet('{genes}') g
         LEFT JOIN read_parquet('{cpg}') c
           ON c.contig = g.contig
