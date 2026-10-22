@@ -105,6 +105,12 @@ class KmerResponse(BaseModel):
     total_kmers: int
     unique_kmers: int
     kmers: List[KmerFrequency]
+    # Convention of packages/pipeline/scripts/common/count_kmers.py: whole assembly (the chrom path segment and
+    # start/end are ignored), forward strand as written (not canonical, no reverse-complement merge), upper-cased
+    # (soft-masking ignored), only A/C/G/T k-mers; a k-mer never spans an N, another symbol or a contig boundary.
+    scope: str = "genome-wide"
+    strand: str = "forward, not canonical"
+    alphabet: str = "ACGT only; k-mers containing N are skipped; soft-masked bases counted"
 
 class SSRSummary(BaseModel):
     period: int

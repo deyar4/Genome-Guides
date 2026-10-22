@@ -376,12 +376,12 @@ export interface TerminalComposition {
 
 export interface ProteinBase {
   protein_id: string;
-  gene_id: string;
+  gene_id: string | null; // null: protein -> gene mapping not available (OPEN)
   gene_name: string | null;
-  transcript_id: string;
-  sequence: string;
+  transcript_id: string | null;
+  sequence: string | null;
   length: number;
-  is_mitochondrial: boolean;
+  is_mitochondrial: boolean | null;
   // only on /proteins/rich
   distinct_amino_acids?: number;
   dominant_amino_acid?: string | null;

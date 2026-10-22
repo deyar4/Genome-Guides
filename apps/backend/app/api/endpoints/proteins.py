@@ -78,12 +78,12 @@ def get_largest(
     return [
         {
             "protein_id": row.get("protein_id", ""),
-            "gene_id": row.get("protein_id", ""),
+            "gene_id": None,  # protein -> gene mapping not available (OPEN, Q-protein-gene)
             "gene_name": None,
-            "transcript_id": "",
-            "sequence": "",
+            "transcript_id": None,
+            "sequence": None,
             "length": int(row.get("length", 0) or 0),
-            "is_mitochondrial": False,
+            "is_mitochondrial": None,
         }
         for row in rows
     ]
@@ -91,12 +91,16 @@ def get_largest(
 @router.get("/tracts/homopolymers", response_model=List[HomopolymerTract])
 def get_homopolymers(
     build: str = Query(...),
+    min_length: int = Query(5, ge=1, description="Minimum tract length in residues"),
+    limit: int = Query(100, gt=0, le=5000),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
     try:
         path = track_service.data_dir / "tracks" / build / "all" / "protein_homopolymers.parquet"
-        query = f"SELECT amino_acid, start_pos as start, end_pos as end, repeat_len as length, protein_id FROM read_parquet('{path}')"
-        data = track_service.execute_query(query)
+        query = f"""SELECT amino_acid, start_pos as start, end_pos as end, repeat_len as length, protein_id
+                    FROM read_parquet('{path}') WHERE repeat_len >= ?
+                    ORDER BY repeat_len DESC, protein_id, start_pos LIMIT ?"""
+        data = track_service.execute_query(query, [min_length, limit])
         return data if data else []
     except duckdb.IOException:
         raise  # handled globally as 404 (no data for this build)
@@ -127,12 +131,12 @@ def get_rich(
     return [
         {
             "protein_id": row.get("protein_id", ""),
-            "gene_id": row.get("protein_id", ""),
+            "gene_id": None,  # protein -> gene mapping not available (OPEN, Q-protein-gene)
             "gene_name": None,
-            "transcript_id": "",
-            "sequence": "",
+            "transcript_id": None,
+            "sequence": None,
             "length": int(row.get("length", 0) or 0),
-            "is_mitochondrial": False,
+            "is_mitochondrial": None,
             "distinct_amino_acids": int(row.get("distinct_amino_acids", 0) or 0),
             "dominant_amino_acid": row.get("dominant_amino_acid"),
             "dominant_frequency_pct": float(row.get("dominant_frequency_pct", 0) or 0),

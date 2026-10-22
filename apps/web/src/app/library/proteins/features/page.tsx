@@ -27,15 +27,11 @@ export default function ProteinFeaturesPage() {
   });
 
   const { data: tracts, isLoading: tractsLoading } = useQuery({
-    queryKey: ['proteins-tracts', activeGenome],
-    queryFn: () => proteinsApi.getHomopolymerTracts(activeGenome),
+    queryKey: ['proteins-tracts', activeGenome, 10, 100],
+    queryFn: () => proteinsApi.getHomopolymerTracts(activeGenome, { min_length: 10, limit: 100 }),
   });
 
-  // The API returns every tract of length >= 5 (min_length / limit are ignored), so select client-side.
-  const topTracts = React.useMemo(
-    () => [...(tracts ?? [])].filter(t => t.length >= 10).sort((a, b) => b.length - a.length).slice(0, 100),
-    [tracts]
-  );
+  const topTracts = tracts ?? [];
 
   return (
     <LibraryShell 
