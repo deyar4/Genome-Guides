@@ -21,13 +21,15 @@ COUNT_COLUMNS = {"count", "te_count", "telomeric_repeats", "n_valid", "n_acgt"}
 
 # Semantics shared by all binned responses (documented here because they are not column-specific).
 BINNING_NOTES = [
-    "A bin covers the windows that overlap the requested [start, end); n_windows says how many. The first and last bin of a "
-    "non-aligned request can therefore hold fewer windows than bin_size/window.",
+    "A bin covers the windows that overlap the requested [start, end); n_windows is the number of windows PRESENT in the bin. For the "
+    "dense 1 kb tracks that is bin_size/window except in the first and last bin of a non-aligned request; for the sparse 100 kb "
+    "count tracks (empty windows are absent) it can be smaller, so a per-length density is sum_count / (bin_end - bin_start), not avg_count. "
+    "The last window of a contig is not clipped, so bin_end can exceed the contig length.",
     "min_* / max_* are the smallest / largest value of a single base window (1 kb for the window tracks) inside the bin, not of a bin-level statistic.",
     "Interval tracks (window_bp = null) are not binned: the rows overlapping [start, end) are returned in start order, at most 5,000, and the response says truncated when the cap cut them.",
     "avg_min_* / avg_max_* (hecate_mprob) are weighted means of per-window minima / maxima of the per-base probability; "
     "they are not a bin minimum or maximum.",
-    "n_null_<col> counts windows whose value is missing (NULL/NaN); they are excluded from the average, never counted as 0.",
+    "n_null_<col> (value columns of the 1 kb tracks) counts windows whose value is missing (NULL/NaN); they are excluded from the average, never counted as 0. Count tracks have no n_null.",
 ]
 
 TRACK_METADATA: Dict[str, Dict[str, Any]] = {
@@ -80,51 +82,62 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
         "columns": {
             "definition": (
                 "Genes per 100 kb window [k*100000, (k+1)*100000): each gene_models row is counted once, in the window "
-                "that contains its 0-based start. A row is one (contig, gene_id): gene ids with several loci on one contig "
-                "are one row (open question Q4). The window end is start + 100000 and is not clipped to the contig length. "
-                "Windows without a gene are ABSENT from the track."
+                "that contains its 0-based start (the start of the union of its transcripts). A row is one (contig, gene_id): "
+                "gene ids with several loci on one contig are one row (open question Q4). The window end is start + 100000 and is "
+                "not clipped to the contig length. Windows without a gene are ABSENT from the track, not zero."
             ),
-            "sum_count": "Exact number of genes in the bin (sum over its windows).",
-            "avg_count": "Mean over the windows PRESENT in the bin only; empty windows are absent, so this overstates density where they occur. Use sum_count / (bin length / 100000) for a density.",
+            "sum_count": "Exact number of genes whose start lies in the bin.",
+            "avg_count": "Mean over the windows PRESENT in the bin only; empty windows are absent, so this overstates density where they occur.",
         },
-        "source": "packages/pipeline/scripts/genes/extract_gene_models.py (window_size = 100000)",
+        "source": "packages/pipeline/scripts/genes/extract_annotation_tracks.py",
     },
     "repeatmasker_density": {
         "window_bp": 100000,
         "columns": {
             "definition": (
                 "RepeatMasker records per 100 kb window, counted in the window containing the record's 0-based start. "
-                "Every line of the .out file is one record, so fragments of one element count separately. "
+                "A record is one data line of the .out file (fragments of one element are separate records) and includes "
+                "every class: Simple_repeat, Low_complexity, Satellite and others, not only transposable elements. "
+                "It is a record count, not base-pair coverage; a record that spans windows is not split. "
                 "Windows without a record are ABSENT from the track; the window end is not clipped to the contig length."
             ),
-            "sum_te_count": "Exact number of records in the bin.",
+            "sum_te_count": "Exact number of records whose start lies in the bin.",
             "avg_te_count": "Mean over the windows PRESENT in the bin only (see gene_density).",
         },
-        "source": "packages/pipeline/scripts/genes/extract_repeatmasker.py (window_size = 100000)",
+        "source": "packages/pipeline/scripts/genes/extract_repeatmasker.py",
     },
     # --- interval tracks: raw rows overlapping [start, end), not binned, at most INTERVAL_ROW_LIMIT rows (truncated flag) ---
     "gene_models": {
         "window_bp": None,
         "columns": {
             "definition": (
-                "Interval track, one row per (contig, gene_id): the first GTF line of that gene on that contig among feature types "
-                "gene, transcript, mRNA, lnc_RNA, ncRNA_gene. Several loci of one gene id on one contig appear as one row (Q4)."
+                "Interval track, one row per (contig, gene_id), built from the GTF lines of feature type transcript or mRNA "
+                "(the T2T GTF has no gene lines). The extent is the union over all transcripts of that gene id on that contig: "
+                "start_pos = min start, end_pos = max end. A gene id with several distant loci on one contig is therefore one "
+                "row spanning all of them (open question Q4)."
             ),
             "start_pos / end_pos": "0-based half-open [start_pos, end_pos); converted once from the 1-based GTF start (start - 1).",
-            "biotype": (
-                "Attribute gene_biotype, else gene_type, else gbkey. If none exists: protein_coding when the transcript id starts with NM_ or XM_, "
-                "otherwise non_coding (a pipeline inference from the id prefix, not an annotation; see Q5)."
+            "strand / gene_name / biotype": (
+                "Taken from the FIRST transcript line of the gene; later transcripts are not compared (strand is not checked for "
+                "agreement). biotype is the attribute gene_biotype or gene_type; if neither exists, protein_coding when the first "
+                "transcript id starts with NM_ or XM_, otherwise non_coding. That is an inference from the id prefix, not an "
+                "annotation, and can disagree with annotated CDS (Q5)."
             ),
+            "skipped lines": "GTF lines with fewer than 9 fields or non-integer coordinates are skipped and only counted in the workflow log.",
         },
-        "source": "packages/pipeline/scripts/genes/extract_gene_models.py",
+        "source": "packages/pipeline/scripts/genes/extract_annotation_tracks.py",
     },
     "repeatmasker_families": {
         "window_bp": None,
         "columns": {
-            "definition": "Interval track, one row per RepeatMasker .out record (alignment fragments are separate rows).",
+            "definition": (
+                "Interval track, one row per RepeatMasker .out data line (alignment fragments are separate rows). Header lines are "
+                "dropped; data lines with fewer than 11 fields or non-numeric score, divergence or coordinates are skipped without "
+                "a count in the output."
+            ),
             "start_pos / end_pos": "0-based half-open; converted once from the 1-based inclusive .out coordinates (start - 1, end).",
             "strand": "+ as given; C (complement) in the .out file is written as -.",
-            "te_name / te_class": "Repeat name and class/family string exactly as in the .out file (columns 10 and 11).",
+            "te_name / te_class": "Repeat name and class/family string exactly as in the .out file (columns 10 and 11); includes non-TE classes such as Simple_repeat and Satellite.",
             "divergence_pct": "Percent divergence from the consensus as reported by RepeatMasker (column 2); not recomputed.",
         },
         "source": "packages/pipeline/scripts/genes/extract_repeatmasker.py",
@@ -133,10 +146,11 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
         "window_bp": None,
         "columns": {
             "definition": (
-                "Interval track: maximal runs of N or n in the assembly FASTA (seqkit locate, case-insensitive regex N+). "
-                "Other IUPAC codes are not counted as gaps."
+                "Interval track: maximal runs of N or n in the assembly FASTA (seqkit locate, case-insensitive regex N+, hits merged "
+                "with bedtools merge). Other IUPAC codes are not gaps. Runs never span contigs. The track is empty when the assembly "
+                "has no N (T2T-CHM13v2.0 has none): an empty track means no gaps, not 'not computed'."
             ),
-            "start_pos / end_pos": "0-based half-open, as written by seqkit locate --bed.",
+            "start_pos / end_pos": "0-based half-open, as written by seqkit locate --bed (checked on a toy FASTA in tests).",
             "gap_length": "end_pos - start_pos, in bases.",
             "gap_type": "Constant 'assembly_gap'; the assembly does not classify gaps.",
         },
@@ -146,9 +160,9 @@ TRACK_METADATA: Dict[str, Dict[str, Any]] = {
         "window_bp": None,
         "columns": {
             "definition": (
-                "Interval track: runs of at least 10 identical bases, found per base A, C, G, T with seqkit locate "
-                "(case-insensitive, so soft-masked bases count) and merged with bedtools merge. N is not searched. "
-                "Not independently recounted (UNVERIFIED)."
+                "Interval track: maximal runs of at least 10 identical bases, found per base A, C, G, T with seqkit locate "
+                "(case-insensitive: a run mixing a and A is one tract and the soft-mask state is lost) and merged with bedtools merge. "
+                "Runs are broken by N and by any non-ACGT code; they never span contigs. Not independently recounted (UNVERIFIED)."
             ),
             "start_pos / end_pos": "0-based half-open.",
             "base": "A, C, G or T.",

@@ -195,6 +195,6 @@ def test_100kb_windows_in_metadata_match_the_pipeline_scripts():
     from pathlib import Path
     root = Path(__file__).resolve().parents[3] / "packages/pipeline/scripts/genes"
     from app.core.track_meta import TRACK_METADATA
-    for script in ("extract_gene_models.py", "extract_repeatmasker.py"):
-        assert re.search(r"window_size = 100000\b", (root / script).read_text()), script
+    assert "// 100000) * 100000" in (root / "extract_annotation_tracks.py").read_text()
+    assert re.search(r"window_size = 100000\b", (root / "extract_repeatmasker.py").read_text())
     assert TRACK_METADATA["gene_density"]["window_bp"] == TRACK_METADATA["repeatmasker_density"]["window_bp"] == 100000

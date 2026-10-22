@@ -57,7 +57,11 @@ rule extract_assembly_gaps:
     shell:
         """
         exec > {log} 2>&1
-        seqkit locate -i -r -P -p '"N+"' --bed {input.fasta} > {output.bed}
+        # seqkit locate with a regex reports every suffix of a run as its own overlapping hit (ACNNNA -> [2,5) [3,5) [4,5)),
+        # so the hits are merged into maximal runs, as in the homopolymer rule; 6 columns for tsv_to_parquet.
+        seqkit locate -i -r -P -p '"N+"' --bed {input.fasta} | \
+            bedtools merge -i - | \
+            awk 'BEGIN{{OFS="\t"}} {{print $1, $2, $3, "N", 0, "+"}}' > {output.bed}
         """
 
 rule convert_gc_skew_to_parquet:
