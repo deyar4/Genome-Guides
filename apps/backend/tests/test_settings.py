@@ -45,3 +45,8 @@ def test_cors_header_follows_settings(monkeypatch):
     assert r.headers.get("access-control-allow-origin") == "https://a.example"
     r = client.get("/health", headers={"Origin": "https://evil.example"})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_service_rejects_a_bad_memory_limit(tmp_path):
+    with pytest.raises(ValueError):
+        DuckDBTrackService(str(tmp_path), memory_limit="1GB'; DROP TABLE x; --")

@@ -6,6 +6,7 @@ Provides high-performance vectorized range queries & server-side downsampling ov
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 import math
+import re
 import threading
 import duckdb
 
@@ -27,6 +28,8 @@ class DuckDBTrackService:
         if threads is not None:
             self.conn.execute(f"SET threads = {int(threads)}")
         if memory_limit is not None:
+            if not re.fullmatch(r"\d+(\.\d+)?\s?(KB|MB|GB|TB|KiB|MiB|GiB|TiB)", memory_limit):
+                raise ValueError("memory_limit must look like 4GB or 512MB")
             self.conn.execute(f"SET memory_limit = '{memory_limit}'")
         self._lock = threading.Lock()
         self._window_cache: Dict[str, int] = {}
