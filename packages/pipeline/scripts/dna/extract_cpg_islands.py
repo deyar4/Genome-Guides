@@ -6,6 +6,11 @@ cg[p] for p in [s, s+W-1); a CG on the last base of window i-1 and the first bas
 boundary and belongs to a region containing both windows (counted once). All threshold tests are exact integer tests.
 Soft-masked bases are folded to uppercase. Windows with any N and the partial last window are never candidates.
 
+Summary tallies that account for every base: head_bases_not_tiled (the [0, grid_offset) bases before the grid) and
+tail_bases_not_tiled (the partial last window) are not candidates; non_acgtn_bases counts bases in tiled windows that
+are neither A, C, G, T nor N (IUPAC codes such as R, Y), non_acgtn_bases_in_tail the same for the tail. Such bases count
+as "other": they are in the window length but in neither C, G nor N.
+
 --legacy-out reproduces the previous bedtools/seqkit/awk track (>= thresholds, cpg_count >= 4, N in the denominator,
 partial last window, straddling CG counted in both windows, no merging) for the equivalence check of the spec."""
 
@@ -22,7 +27,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "common"))
 from resource_args import add_resource_args
 
-C, G, N = ord("C"), ord("G"), ord("N")
+A, C, G, T, N = (ord(ch) for ch in "ACGTN")
 
 
 def read_fai(path):
@@ -53,8 +58,10 @@ def window_stats(rows):
     """rows: 2-D uint8 array (windows x width). Per-window counts as int64 arrays."""
     a = rows & 0xDF  # fold case; only letters matter here
     is_c, is_g, is_n = a == C, a == G, a == N
+    other = ~((a == A) | is_c | is_g | (a == T) | is_n)  # IUPAC codes other than N (R, Y, ...) and any other byte
     return {
         "c": is_c.sum(1, dtype=np.int64), "g": is_g.sum(1, dtype=np.int64), "n": is_n.sum(1, dtype=np.int64),
+        "x": other.sum(1, dtype=np.int64),
         "cg_in": (is_c[:, :-1] & is_g[:, 1:]).sum(1, dtype=np.int64),
         "first_g": is_g[:, 0], "last_c": is_c[:, -1],
     }
@@ -73,7 +80,7 @@ def contig_window_stats(handle, entry, window, block_bases, offset):
         if nw:
             parts.append(window_stats(buf[: nw * window].reshape(nw, window)))
         carry = buf[nw * window:]
-    keys = ("c", "g", "n", "cg_in", "first_g", "last_c")
+    keys = ("c", "g", "n", "x", "cg_in", "first_g", "last_c")
     stats = {k: np.concatenate([p[k] for p in parts]) if parts else np.empty(0, dtype=np.int64) for k in keys}
     tail = window_stats(carry[None, :]) if len(carry) > 1 else None
     return stats, (len(carry) if len(carry) else 0), tail, carry
@@ -97,6 +104,7 @@ def find_islands(name, offset, window, st, p, tally):
         & (c * g > 0) & (cgi * window * p["oe_den"] > p["oe_num"] * c * g)
     tally["windows"] += nw
     tally["windows_with_n"] += int((n > 0).sum())
+    tally["non_acgtn_bases"] += int(st["x"].sum())
     tally["candidate_windows"] += int(cand.sum())
     straddle = np.zeros(nw, dtype=np.int64)
     straddle[1:] = st["last_c"][:-1] & st["first_g"][1:]
@@ -166,7 +174,9 @@ def main():
     if window < 2 or args.block_bases < window:
         raise SystemExit("window must be >= 2 and block-bases >= window")
     tally = {k: 0 for k in ("windows", "windows_with_n", "candidate_windows", "runs", "runs_rejected",
-                            "runs_rejected_bp", "partial_windows", "contigs_shorter_than_window")}
+                            "runs_rejected_bp", "partial_windows", "contigs_shorter_than_window",
+                            "head_bases_not_tiled", "tail_bases_not_tiled", "non_acgtn_bases",
+                            "non_acgtn_bases_in_tail")}
     islands, legacy = [], []
     with open(args.fasta, "rb") as handle:
         for entry in read_fai(args.fai):
@@ -174,6 +184,9 @@ def main():
             st, tail_len, tail, carry = contig_window_stats(handle, entry, window, args.block_bases, args.grid_offset)
             if len(st["c"]) == 0 and entry[1] < window:
                 tally["contigs_shorter_than_window"] += 1
+            tally["head_bases_not_tiled"] += min(args.grid_offset, entry[1])
+            tally["tail_bases_not_tiled"] += tail_len
+            tally["non_acgtn_bases_in_tail"] += int((~np.isin(carry & 0xDF, (A, C, G, T, N))).sum())
             if tail_len:
                 tally["partial_windows"] += 1
             islands += find_islands(name, args.grid_offset, window, st, p, tally)

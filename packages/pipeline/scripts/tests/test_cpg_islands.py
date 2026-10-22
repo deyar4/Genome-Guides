@@ -149,3 +149,17 @@ def test_short_contig_and_cg_at_last_base_and_partial_window(tmp_path):
     rows, summary, _ = run(tmp_path, contigs)
     assert rows == naive(contigs)
     assert summary["contigs_shorter_than_window"] == "1" and summary["partial_windows"] == "2"
+
+
+def test_summary_accounts_for_head_tail_and_iupac_bases(tmp_path):
+    # 130 bp contig, window 60, grid offset 10: head [0,10), windows [10,70) and [70,130) -> tail empty? use 133 bp
+    seq = "A" * 20 + "R" + "A" * 30 + "Y" + "A" * 81  # length 133; R at 20, Y at 52 -> inside the first tiled window
+    seq = seq[:-2] + "RA"  # R in the 2-base tail
+    contigs = {"c": seq}
+    _, summary, _ = run(tmp_path, contigs, window=60, extra=("--grid-offset", "10", "--min-length", "60"))
+    # tiled windows: [10,70), [70,130); tail [130,133) has 3 bases
+    assert summary["head_bases_not_tiled"] == "10"
+    assert summary["tail_bases_not_tiled"] == "3"
+    assert summary["non_acgtn_bases"] == "2"          # R at 20 and Y at 52, both in [10,70)
+    assert summary["non_acgtn_bases_in_tail"] == "1"  # the R at 131
+    assert summary["windows"] == "2"
