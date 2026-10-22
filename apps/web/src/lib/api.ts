@@ -21,7 +21,7 @@ import {
   CpGAssociation,
   RNACluster,
   RNASummary,
-  HostGuestRelationship,
+  HostGuestResponse,
   SpliceSiteConsensus,
   SpliceSiteRecord,
   ProteinStats,
@@ -134,8 +134,8 @@ export const rnaApi = {
   getSummary: (build: string) => fetcher<RNASummary>("/rna/stats/summary", { build }),
   getClusters: (build: string, params: { rna_type?: string, chrom?: string } = {}) => 
     fetcher<RNACluster[]>("/rna/clusters", { build, ...params }),
-  getRelationships: (build: string, params: { host_gene_id?: string, guest_gene_id?: string } = {}) => 
-    fetcher<HostGuestRelationship[]>("/rna/relationships", { build, ...params }),
+  getRelationships: (build: string, params: { contig?: string, host_gene_id?: string, guest_gene_id?: string, limit?: number, offset?: number } = {}) =>
+    fetcher<HostGuestResponse>("/rna/relationships", { build, ...params }),
   getSpliceConsensus: (build: string, site_type?: string) => 
     fetcher<SpliceSiteConsensus[]>("/rna/splice-sites", { build, ...(site_type ? { site_type } : {}) }),
   getSpliceRecords: (build: string, params: { site_type?: string; chrom?: string; limit?: number } = {}) =>

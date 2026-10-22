@@ -65,6 +65,8 @@ rule t2t_all:
         "data/tracks/t2t/all/gene_density.parquet",
         "data/tracks/t2t/all/gene_biotype_census.parquet",
         "data/tracks/t2t/all/gene_spacing.parquet",
+        "data/tracks/t2t/all/nested_gene_pairs.parquet",
+        "data/tracks/t2t/all/nested_genes_summary.tsv",
         "data/tracks/t2t/all/gene_overlaps.parquet",
         "data/tracks/t2t/all/repeatmasker_families.parquet",
         "data/tracks/t2t/all/repeatmasker_density.parquet",

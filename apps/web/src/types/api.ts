@@ -227,23 +227,34 @@ export interface GeneOverlap {
 }
 
 export interface NestedGenePair {
-  host_gene_id: string;
-  host_gene_name: string | null;
-  host_biotype: string | null;
-  guest_gene_id: string;
-  guest_gene_name: string | null;
-  guest_biotype: string | null;
   chrom: string;
+  host_gene_id: string;
+  host_locus: number;
+  host_gene_name: string | null;
+  host_coding_class: string; // protein_coding = some transcript has annotated CDS, else non_coding
+  host_start: number;
+  host_end: number;
+  guest_gene_id: string;
+  guest_locus: number;
+  guest_gene_name: string | null;
+  guest_coding_class: string;
   guest_start: number;
   guest_end: number;
-  strand_relation: string;
+  relationship_type: string; // intronic | exonic_overlap | mixed | span_only
+  strand_relation: string; // same | opposite | ambiguous
+  is_direct: boolean;
 }
 
 export interface NestedGeneSummary {
   total_pairs: number;
+  direct_pairs: number;
   same_strand: number;
   opposite_strand: number;
-  sample: NestedGenePair[];
+  ambiguous_strand: number;
+  by_type: Record<string, number>;
+  distinct_hosts: number;
+  distinct_guests: number;
+  first_pairs: NestedGenePair[]; // first pairs in coordinate order, not a random sample
 }
 
 export interface CpGAssociation {
@@ -286,13 +297,26 @@ export interface RNASummary {
 }
 
 export interface HostGuestRelationship {
+  contig: string;
   host_gene_id: string;
+  host_locus: number;
   host_gene_name: string | null;
   guest_gene_id: string;
+  guest_locus: number;
   guest_gene_name: string | null;
-  guest_biotype: string;
+  guest_start: number;
+  guest_end: number;
+  guest_coding_class: string; // non_coding = no annotated CDS in any transcript
   relationship_type: string;
-  is_same_strand: boolean;
+  strand_relation: string;
+  is_same_strand: boolean | null; // null when ambiguous
+}
+
+export interface HostGuestResponse {
+  total: number;
+  returned: number;
+  truncated: boolean;
+  relationships: HostGuestRelationship[];
 }
 
 export interface SpliceSiteConsensus {

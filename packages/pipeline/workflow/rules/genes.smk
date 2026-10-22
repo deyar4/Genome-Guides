@@ -48,6 +48,33 @@ rule compute_gene_spacing:
             -o data/tracks/{wildcards.genome}/all
         """
 
+rule compute_nested_genes:
+    input:
+        gene_models="data/tracks/{genome}/all/gene_models.parquet",
+        transcripts="data/tracks/{genome}/all/transcripts.parquet",
+        exons="data/tracks/{genome}/all/exons.parquet",
+        introns="data/tracks/{genome}/all/introns.parquet",
+        architecture="data/tracks/{genome}/all/gene_architecture.parquet",
+        fai="data/raw/{genome}.fa.fai"
+    output:
+        pairs="data/tracks/{genome}/all/nested_gene_pairs.parquet",
+        summary="data/tracks/{genome}/all/nested_genes_summary.tsv"
+    log:
+        "logs/{genome}/compute_nested_genes.log"
+    benchmark:
+        "benchmarks/{genome}/compute_nested_genes.tsv"
+    threads: config["resources"]["analytical"]["threads"]
+    resources:
+        mem_mb=config["resources"]["analytical"]["mem_mb"]
+    shell:
+        """
+        exec > {log} 2>&1
+        python3 packages/pipeline/scripts/genes/extract_nested_genes.py \
+            --tracks-dir data/tracks/{wildcards.genome}/all --fai {input.fai} \
+            --out-parquet {output.pairs} --out-summary {output.summary} \
+            --threads {threads} --memory-mb {resources.mem_mb}
+        """
+
 rule parse_splice_and_ncrna:
     input:
         gtf="data/raw/{genome}.gtf.gz",

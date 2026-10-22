@@ -166,7 +166,7 @@ export default function RnaOverview() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
            {[
              { title: 'RNA Clusters', desc: 'Gene clusters by RNA type.', href: '/library/rna/clusters', icon: Shapes, color: 'text-blue-500' },
-             { title: 'Nested Genes', desc: 'Host and guest gene pairs (not available yet).', href: '/library/rna/relationships', icon: Target, color: 'text-emerald-500' },
+             { title: 'Nested Genes', desc: 'Genes without annotated CDS lying inside another gene.', href: '/library/rna/relationships', icon: Target, color: 'text-emerald-500' },
              { title: 'Splice Junctions', desc: 'Donor and acceptor site nucleotide probabilities.', href: '/library/rna/splice-sites', icon: Activity, color: 'text-amber-500' },
            ].map((section, i) => (
              <Card key={i} className="p-8 group hover:border-primary/50 transition-all cursor-pointer overflow-hidden relative">

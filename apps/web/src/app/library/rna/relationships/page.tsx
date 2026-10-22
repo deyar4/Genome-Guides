@@ -21,15 +21,15 @@ import { ArrowRight } from 'lucide-react';
 export default function RnaRelationshipsPage() {
   const { activeGenome } = useGenomeStore();
 
-  const { data: relationships, isLoading } = useQuery({
+  const { data: result, isLoading } = useQuery({
     queryKey: ['rna-relationships', activeGenome],
-    queryFn: () => rnaApi.getRelationships(activeGenome),
+    queryFn: () => rnaApi.getRelationships(activeGenome, { limit: 100 }),
   });
 
   return (
     <LibraryShell 
       title="Nested Genes" 
-      subtitle="Pairs of a host gene and a guest gene located within it."
+      subtitle="Genes without an annotated CDS (guests) located entirely inside the span of another gene (host)."
     >
       <div className="space-y-8 pb-20">
         
@@ -40,7 +40,7 @@ export default function RnaRelationshipsPage() {
               <TableRow>
                 <TableHead>Host Gene</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
-                <TableHead>Guest ncRNA</TableHead>
+                <TableHead>Guest (no annotated CDS)</TableHead>
                 <TableHead>Relationship</TableHead>
                 <TableHead>Strand</TableHead>
               </TableRow>
@@ -56,14 +56,14 @@ export default function RnaRelationshipsPage() {
                     <TableCell><div className="h-4 w-16 bg-slate-100 dark:bg-zinc-800 animate-pulse rounded" /></TableCell>
                   </TableRow>
                 ))
-              ) : relationships?.length === 0 ? (
+              ) : result?.total === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-slate-500">
-                    Nested-gene detection is not available yet: the API endpoint is a placeholder that always returns an empty list (this is not a measured result of zero nested genes).
+                    No nested gene without annotated CDS was found in this annotation.
                   </TableCell>
                 </TableRow>
               ) : (
-                relationships?.slice(0, 100).map((r, i) => (
+                result?.relationships.map((r, i) => (
                   <TableRow key={i} className="group hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
@@ -82,18 +82,18 @@ export default function RnaRelationshipsPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-tight px-1.5 py-0">
-                        {r.relationship_type}
+                        {r.relationship_type.replace('_', ' ')}
                       </Badge>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                         Guest biotype: <span className="text-slate-500 font-medium">{r.guest_biotype}</span>
+                      <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                         {r.contig}:{r.guest_start.toLocaleString()}-{r.guest_end.toLocaleString()}
                       </div>
                     </TableCell>
                     <TableCell>
                        <Badge variant="secondary" className={cn(
                          "text-[10px] uppercase font-bold border-none",
-                         r.is_same_strand ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                         r.is_same_strand === null ? "bg-slate-100 text-slate-600" : r.is_same_strand ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                        )}>
-                          {r.is_same_strand ? 'Sense' : 'Antisense'}
+                          {r.is_same_strand === null ? 'Ambiguous' : r.is_same_strand ? 'Same strand' : 'Opposite strand'}
                        </Badge>
                     </TableCell>
                   </TableRow>
@@ -102,6 +102,13 @@ export default function RnaRelationshipsPage() {
             </TableBody>
           </Table>
         </Card>
+
+        {result && (
+          <p className="text-xs text-slate-500">
+            {result.truncated ? `First ${result.returned.toLocaleString()} of ` : ''}{result.total.toLocaleString()} nested genes without annotated CDS, in coordinate order.
+            &quot;No annotated CDS&quot; means no transcript of the gene has a CDS feature in the annotation; it includes lncRNA, tRNA, rRNA, snoRNA and pseudogenes, and the annotation gives no finer class.
+          </p>
+        )}
 
       </div>
     </LibraryShell>

@@ -28,13 +28,25 @@ class RNASummary(BaseModel):
     cluster_summaries: List[RNAClusterSummary]
 
 class HostGuestRelationship(BaseModel):
+    contig: str
     host_gene_id: str
+    host_locus: int
     host_gene_name: Optional[str] = None
     guest_gene_id: str
+    guest_locus: int
     guest_gene_name: Optional[str] = None
-    guest_biotype: str
+    guest_start: int
+    guest_end: int
+    guest_coding_class: str  # non_coding = no annotated CDS in any transcript
     relationship_type: str
-    is_same_strand: bool
+    strand_relation: str
+    is_same_strand: Optional[bool] = None  # None when the strand relation is ambiguous
+
+class HostGuestResponse(BaseModel):
+    total: int
+    returned: int
+    truncated: bool
+    relationships: List[HostGuestRelationship]
 
 class SpliceSiteConsensus(BaseModel):
     site_type: str

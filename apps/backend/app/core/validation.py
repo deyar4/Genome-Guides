@@ -15,7 +15,7 @@ FREE_TEXT = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-:+ ]{0,63}$")
 IDENTIFIER_PARAMS = {
     "build", "genome", "contig", "chrom", "track_name", "rna_type", "site_type", "name", "aa",
 }
-FREE_TEXT_PARAMS = {"q", "gene_id"}
+FREE_TEXT_PARAMS = {"q", "gene_id", "host_gene_id", "guest_gene_id"}
 
 
 class InvalidTrackRequest(ValueError):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any, Optional
 
 from app.api.dependencies import get_track_service
@@ -7,6 +7,7 @@ from app.schemas.rna import (
     RNASummary,
     RNACluster,
     HostGuestRelationship,
+    HostGuestResponse,
     SpliceSiteConsensus
 )
 
@@ -79,12 +80,36 @@ def get_clusters(
         row["genes"] = genes.split(",") if isinstance(genes, str) and genes else []
     return rows
 
-@router.get("/relationships", response_model=List[HostGuestRelationship])
+@router.get("/relationships", response_model=HostGuestResponse)
 def get_relationships(
     build: str = Query(...),
+    contig: Optional[str] = Query(None, description="gene_id alone is ambiguous for PAR genes; without contig all matches are returned"),
+    host_gene_id: Optional[str] = Query(None),
+    guest_gene_id: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
-    return []
+    """Nested pairs whose guest has no annotated CDS in any transcript (docs/analyses/02_nested_genes.md, D43).
+    'non_coding' here is not an RNA subclass; the annotation gives none."""
+    path = track_service.data_dir / "tracks" / build / "all" / "nested_gene_pairs.parquet"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Track 'nested_gene_pairs.parquet' not found for build '{build}'")
+    where, params = ["guest_coding_class = 'non_coding'"], []
+    for column, value in (("contig", contig), ("host_gene_id", host_gene_id), ("guest_gene_id", guest_gene_id)):
+        if value:
+            where.append(f"{column} = ?")
+            params.append(value)
+    clause = " AND ".join(where)
+    total = int(track_service.execute_query(
+        f"SELECT COUNT(*) AS n FROM read_parquet('{path}') WHERE {clause}", params)[0]["n"])
+    rows = track_service.execute_query(f"""
+        SELECT contig, host_gene_id, host_locus, host_gene_name, guest_gene_id, guest_locus, guest_gene_name,
+               guest_start, guest_end, guest_coding_class, relationship_type, strand_relation,
+               CASE strand_relation WHEN 'same' THEN TRUE WHEN 'opposite' THEN FALSE ELSE NULL END AS is_same_strand
+        FROM read_parquet('{path}', file_row_number = true) WHERE {clause}
+        ORDER BY file_row_number LIMIT ? OFFSET ?""", params + [limit, offset])
+    return HostGuestResponse(total=total, returned=len(rows), truncated=offset + len(rows) < total, relationships=rows)
 
 @router.get("/splice-sites", response_model=List[SpliceSiteConsensus])
 def get_splice_consensus(

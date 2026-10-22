@@ -187,10 +187,31 @@ def search_genes(
 @router.get("/nested/summary", response_model=NestedGeneSummary)
 def get_nested(
     build: str = Query(...),
+    limit: int = Query(50, ge=1, le=500),
     track_service: DuckDBTrackService = Depends(get_track_service)
 ):
-    # Return placeholder as requested
-    return NestedGeneSummary(total_pairs=0, same_strand=0, opposite_strand=0, sample=[])
+    """Nested gene pairs (docs/analyses/02_nested_genes.md, D43). first_pairs are the first `limit` pairs in
+    coordinate order (contig in FASTA-index order), not a random sample."""
+    path = _track_path(track_service, build, "nested_gene_pairs.parquet")
+    agg = track_service.execute_query(f"""
+        SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_direct) AS direct,
+               COUNT(*) FILTER (WHERE strand_relation = 'same') AS same_strand,
+               COUNT(*) FILTER (WHERE strand_relation = 'opposite') AS opposite_strand,
+               COUNT(*) FILTER (WHERE strand_relation = 'ambiguous') AS ambiguous_strand,
+               COUNT(DISTINCT (contig, host_gene_id, host_locus)) AS hosts,
+               COUNT(DISTINCT (contig, guest_gene_id, guest_locus)) AS guests
+        FROM read_parquet('{path}')""")[0]
+    by_type = {r["relationship_type"]: int(r["n"]) for r in track_service.execute_query(
+        f"SELECT relationship_type, COUNT(*) AS n FROM read_parquet('{path}') GROUP BY 1 ORDER BY 1")}
+    rows = track_service.execute_query(f"""
+        SELECT contig AS chrom, host_gene_id, host_locus, host_gene_name, host_coding_class, host_start, host_end,
+               guest_gene_id, guest_locus, guest_gene_name, guest_coding_class, guest_start, guest_end,
+               relationship_type, strand_relation, is_direct
+        FROM read_parquet('{path}', file_row_number = true) ORDER BY file_row_number LIMIT ?""", [limit])
+    return NestedGeneSummary(
+        total_pairs=int(agg["total"]), direct_pairs=int(agg["direct"]), same_strand=int(agg["same_strand"]),
+        opposite_strand=int(agg["opposite_strand"]), ambiguous_strand=int(agg["ambiguous_strand"]), by_type=by_type,
+        distinct_hosts=int(agg["hosts"]), distinct_guests=int(agg["guests"]), first_pairs=rows)
 
 
 def _track_path(track_service: DuckDBTrackService, build: str, name: str):

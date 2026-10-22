@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class BiotypeStat(BaseModel):
     biotype: str
@@ -36,19 +36,30 @@ class GeneSearchResponse(BaseModel):
     end: Optional[int] = None
 
 class NestedGenePair(BaseModel):
-    host_gene_id: str
-    host_gene_name: Optional[str] = None
-    host_biotype: Optional[str] = None
-    guest_gene_id: str
-    guest_gene_name: Optional[str] = None
-    guest_biotype: Optional[str] = None
     chrom: str
+    host_gene_id: str
+    host_locus: int
+    host_gene_name: Optional[str] = None
+    host_coding_class: str  # protein_coding = some transcript has annotated CDS, else non_coding
+    host_start: int
+    host_end: int
+    guest_gene_id: str
+    guest_locus: int
+    guest_gene_name: Optional[str] = None
+    guest_coding_class: str
     guest_start: int
     guest_end: int
-    strand_relation: str
+    relationship_type: str  # intronic | exonic_overlap | mixed | span_only
+    strand_relation: str  # same | opposite | ambiguous
+    is_direct: bool
 
 class NestedGeneSummary(BaseModel):
     total_pairs: int
+    direct_pairs: int
     same_strand: int
     opposite_strand: int
-    sample: List[NestedGenePair]
+    ambiguous_strand: int
+    by_type: Dict[str, int]
+    distinct_hosts: int
+    distinct_guests: int
+    first_pairs: List[NestedGenePair]  # the first `limit` pairs in coordinate order, NOT a random sample

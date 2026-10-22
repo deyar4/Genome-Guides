@@ -14,7 +14,7 @@ import { useChartTheme } from '@/hooks/use-chart-theme';
 import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-container';
 import { SectionHeader } from '@/components/library/dna/shared';
 import { GeneDensityMap } from '@/components/library/genes/gene-density-map';
-import { Info, Map, Fingerprint, Anchor } from 'lucide-react';
+import { Info, Map, Anchor } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 
 export default function GeneDistributionPage() {
@@ -215,13 +215,9 @@ export default function GeneDistributionPage() {
         <section>
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
-              title="Nested Gene Discoveries" 
-              subtitle="Small genes (guests) that reside entirely within the introns of larger genes (hosts)."
+              title="Nested Genes" 
+              subtitle="Genes (guests) whose span lies entirely inside the span of another gene (host). The guest may sit in an intron or overlap an exon of the host."
             />
-            <div className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-full border border-emerald-100 dark:border-emerald-800 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-               <Fingerprint className="h-3 w-3" />
-               Intronic Residency
-            </div>
           </div>
 
           <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 shadow-sm">
@@ -230,7 +226,7 @@ export default function GeneDistributionPage() {
                 <TableRow>
                   <TableHead className="w-48">Guest Gene (Nested)</TableHead>
                   <TableHead className="w-48">Host Gene (Container)</TableHead>
-                  <TableHead>Biotype</TableHead>
+                  <TableHead>Relationship</TableHead>
                   <TableHead>Scaffold</TableHead>
                   <TableHead className="text-right">Strand Relation</TableHead>
                 </TableRow>
@@ -240,8 +236,8 @@ export default function GeneDistributionPage() {
                   [...Array(10)].map((_, i) => <TableRow key={i}><TableCell colSpan={5}><div className="h-10 w-full bg-slate-50 dark:bg-zinc-900/50 animate-pulse rounded" /></TableCell></TableRow>)
                 ) : (
                   nested && nested.total_pairs === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">Nested-gene detection is not available: the API endpoint returns a placeholder (0 pairs), which is not a measured result.</TableCell></TableRow>
-                  ) : nested?.sample.slice(0, 15).map((pair, i) => (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24 text-slate-500">No nested gene pairs were found in this annotation.</TableCell></TableRow>
+                  ) : nested?.first_pairs.slice(0, 15).map((pair, i) => (
                     <TableRow key={i} className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors group">
                       <TableCell>
                          <div className="flex flex-col">
@@ -257,7 +253,7 @@ export default function GeneDistributionPage() {
                       </TableCell>
                       <TableCell>
                          <Badge variant="outline" className="text-[9px] font-bold uppercase tracking-tighter">
-                            {pair.guest_biotype?.replace('_', ' ')}
+                            {pair.relationship_type.replace('_', ' ')}
                          </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-xs font-bold text-slate-500">{pair.chrom}</TableCell>
@@ -266,7 +262,7 @@ export default function GeneDistributionPage() {
                            "text-[9px] font-bold uppercase tracking-tight px-1.5 py-0",
                            pair.strand_relation === 'same' ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20" : "bg-amber-50 text-amber-700 dark:bg-amber-900/20"
                          )}>
-                            {pair.strand_relation} Strand
+                            {pair.strand_relation === 'ambiguous' ? 'strand ambiguous' : `${pair.strand_relation} strand`}
                          </Badge>
                       </TableCell>
                     </TableRow>
@@ -277,7 +273,7 @@ export default function GeneDistributionPage() {
             {!nestedLoading && nested?.total_pairs && nested.total_pairs > 15 && (
               <div className="p-4 bg-slate-50 dark:bg-zinc-900/50 border-t border-slate-100 dark:border-zinc-800 text-center">
                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                   Showing 15 of {formatNumber(nested.total_pairs)} detected nested gene pairs
+                   First 15 pairs in coordinate order (not a random sample) of {formatNumber(nested.total_pairs)} nested gene pairs ({formatNumber(nested.direct_pairs)} with a direct host; {formatNumber(nested.distinct_guests)} distinct guests in {formatNumber(nested.distinct_hosts)} hosts). Pairs are counted per (host, guest), so a gene inside a nested gene is also paired with the outer host.
                  </p>
               </div>
             )}
