@@ -76,7 +76,7 @@ export default function SequenceToolsPage() {
   return (
     <LibraryShell 
       title="Sequence Analysis" 
-      subtitle="Extract raw genomic substrings and visualize biochemical strand asymmetry."
+      subtitle="Extract a sequence range and plot GC skew along the chromosome."
     >
       <div className="space-y-16 pb-20">
         
@@ -85,7 +85,7 @@ export default function SequenceToolsPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Analysis Parameters" 
-              subtitle="Specify genomic coordinates and target scaffold for extraction."
+              subtitle="Chromosome and 0-based half-open range."
             />
             <div className="px-3 py-1 bg-slate-100 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                <Settings2 className="h-3 w-3" />
@@ -137,7 +137,7 @@ export default function SequenceToolsPage() {
             </div>
             <div className="px-8 py-3 bg-slate-50 dark:bg-zinc-900 border-t border-slate-100 dark:border-zinc-800 flex items-center gap-2">
                <Activity className="h-3 w-3 text-slate-400" />
-               <span className="text-[10px] text-slate-400 italic">Analysis limited to 100kb windows for real-time performance.</span>
+               <span className="text-[10px] text-slate-400 italic">Range limited to 100 kb.</span>
             </div>
           </Card>
         </section>
@@ -147,7 +147,7 @@ export default function SequenceToolsPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Reference String" 
-              subtitle="Materialized sequence data extracted directly from the reference assembly."
+              subtitle="Reference sequence of the selected range."
             />
             <div className="flex gap-3">
               <Button variant="outline" size="sm" className="h-9 gap-2 text-[10px] font-bold uppercase tracking-widest border-slate-200 dark:border-zinc-800" onClick={copyToClipboard} disabled={!sequence}>

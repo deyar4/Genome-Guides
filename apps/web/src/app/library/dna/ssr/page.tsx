@@ -84,7 +84,7 @@ export default function SSRAnalysisPage() {
   return (
     <LibraryShell 
       title="SSR Analysis" 
-      subtitle="Characterization of Simple Sequence Repeats (Microsatellites) and low-complexity regions."
+      subtitle="Tandem repeat tracts of period 1 to 6 per chromosome (0-based coordinates)."
     >
       <div className="space-y-12 pb-20">
         
@@ -270,7 +270,6 @@ export default function SSRAnalysisPage() {
            <SectionHeader 
              title="First Tracts" 
              subtitle="The first 100 tracts of the selected chromosome by start position (0-based), not ranked by length or complexity."
-             badge="Dataset View"
            />
            <Card className="overflow-hidden border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm mt-6">
                 <Table>

@@ -39,7 +39,7 @@ export default function ProteinsOverview() {
   return (
     <LibraryShell 
       title="Protein Census" 
-      subtitle="Comprehensive analysis of the proteome: from global composition to structural motifs and length distributions."
+      subtitle="Length and amino acid composition of the annotated protein records."
     >
       <div className="space-y-12 pb-20">
         
@@ -129,10 +129,7 @@ export default function ProteinsOverview() {
            <div className="space-y-6">
               <Card className="p-8 bg-primary text-primary-foreground border-none shadow-xl relative overflow-hidden group">
                  <div className="relative z-10">
-                    <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-4">Biological Insight</h4>
-                    <p className="text-sm text-slate-300 leading-relaxed mb-6">
-                       The most frequent residues in the chart are listed first (sorted by percentage).
-                    </p>
+                    <h4 className="font-bold text-xs uppercase tracking-widest text-primary mb-4">Summary</h4>
                     <ul className="space-y-3">
                        <li className="flex items-start gap-3 text-xs text-slate-400">
                           <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
@@ -162,7 +159,7 @@ export default function ProteinsOverview() {
                           <span className="text-sm font-bold text-slate-700 dark:text-zinc-300 group-hover:text-primary transition-colors">AA Composition</span>
                           <Activity className="h-4 w-4 text-slate-300 group-hover:text-primary transition-colors" />
                        </div>
-                       <p className="text-xs text-slate-400">Nuclear vs. Mitochondrial frequencies.</p>
+                       <p className="text-xs text-slate-400">Residue frequencies and terminal usage.</p>
                     </a>
                     <a href="/library/proteins/features" className="block group">
                        <div className="flex items-center justify-between mb-1">

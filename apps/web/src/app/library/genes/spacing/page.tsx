@@ -41,7 +41,7 @@ export default function GeneSpacingPage() {
   return (
     <LibraryShell 
       title="Spacing & Overlaps" 
-      subtitle="Intergenic distances, gene deserts, and overlapping functional units."
+      subtitle="Distances between adjacent genes and overlapping gene pairs."
     >
       <div className="space-y-12 pb-20">
         

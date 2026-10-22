@@ -14,7 +14,7 @@ import { ChromosomeBrowser } from '@/components/library/dna/chromosome-browser';
 import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-container';
 import { ResponsiveBar } from '@nivo/bar';
 import { useChartTheme } from '@/hooks/use-chart-theme';
-import { Info, BarChart3, TrendingUp, Activity } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 export default function DNACompositionPage() {
   const { summary, dinucleotides, primaryChroms, isLoading, isError } = useDNAStats();
@@ -32,10 +32,10 @@ export default function DNACompositionPage() {
     if (!nuclearComp || totalNuclearBases === 0) return [];
     
     return [
-      { id: 'A', name: 'Adenine', value: nuclearComp.a, color: NUCLEOTIDE_COLORS.A, desc: 'Purine base, pairs with Thymine via 2 hydrogen bonds.' },
-      { id: 'C', name: 'Cytosine', value: nuclearComp.c, color: NUCLEOTIDE_COLORS.C, desc: 'Pyrimidine base, subject to methylation at CpG sites.' },
-      { id: 'G', name: 'Guanine', value: nuclearComp.g, color: NUCLEOTIDE_COLORS.G, desc: 'Purine base, pairs with Cytosine via 3 hydrogen bonds.' },
-      { id: 'T', name: 'Thymine', value: nuclearComp.t, color: NUCLEOTIDE_COLORS.T, desc: 'Pyrimidine base, unique to DNA (replaced by Uracil in RNA).' },
+      { id: 'A', name: 'Adenine', value: nuclearComp.a, color: NUCLEOTIDE_COLORS.A, desc: 'Adenine count over total ACGT.' },
+      { id: 'C', name: 'Cytosine', value: nuclearComp.c, color: NUCLEOTIDE_COLORS.C, desc: 'Cytosine count over total ACGT.' },
+      { id: 'G', name: 'Guanine', value: nuclearComp.g, color: NUCLEOTIDE_COLORS.G, desc: 'Guanine count over total ACGT.' },
+      { id: 'T', name: 'Thymine', value: nuclearComp.t, color: NUCLEOTIDE_COLORS.T, desc: 'Thymine count over total ACGT.' },
     ].map(b => ({
       ...b,
       percent: (b.value / totalNuclearBases) * 100
@@ -78,7 +78,7 @@ export default function DNACompositionPage() {
   return (
     <LibraryShell 
       title="Base Composition" 
-      subtitle="Comprehensive analysis of nucleotide frequency, dinucleotide bias, and scaffold-level chemical variation."
+      subtitle="Base counts, dinucleotide observed/expected ratios and GC content of T2T-CHM13v2.0."
     >
       <div className="space-y-20 pb-20">
         
@@ -87,7 +87,7 @@ export default function DNACompositionPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Global Nucleotide Landscape" 
-              subtitle="Macro-scale distribution of nitrogenous bases across the entire reference assembly."
+              subtitle="Share of A, C, G, T over the whole assembly (percent of ACGT bases)."
             />
             <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800">
                <Activity className="h-3.5 w-3.5 text-slate-400" />
@@ -133,7 +133,7 @@ export default function DNACompositionPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Chromosomal Dynamics" 
-              subtitle="Fine-grained analysis of local sequence composition and assembly resolution."
+              subtitle="GC content (%) in windows along one chromosome."
             />
           </div>
           <ChromosomeBrowser 
@@ -153,7 +153,7 @@ export default function DNACompositionPage() {
 
           <GenomicChartContainer
             title="GC Deviation by Scaffold"
-            subtitle="Variation in GC content across primary chromosomes compared to the genome average."
+            subtitle="Chromosome GC content minus whole-assembly GC content, in percentage points."
             isLoading={isLoading}
             isError={isError}
             onRetry={() => summary.refetch()}
@@ -264,44 +264,6 @@ export default function DNACompositionPage() {
           </GenomicChartContainer>
         </section>
 
-        {/* INFO FOOTER */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">CpG Suppression</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   Vertebrate genomes show a distinct under-representation of the CG dinucleotide due to deamination of 5-methylcytosine to thymine.
-                 </p>
-              </div>
-           </div>
-           
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-                 <TrendingUp className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Isochore Theory</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   The genome is composed of long segments (isochores) with relatively homogeneous GC content, which correlate with gene density.
-                 </p>
-              </div>
-           </div>
-
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                 <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-blue-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Chargaff&apos;s Rule</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   In double-stranded DNA, A=T and C=G, but composition varies significantly across different species and genomic regions.
-                 </p>
-              </div>
-           </div>
-        </div>
 
       </div>
     </LibraryShell>

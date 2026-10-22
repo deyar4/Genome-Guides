@@ -58,7 +58,7 @@ export default function RichProteinsPage() {
   return (
     <LibraryShell 
       title="Amino Acid Richness" 
-      subtitle="Identify proteins with extreme compositional bias toward specific residues."
+      subtitle="Proteins whose most frequent residue reaches a minimum share of the sequence."
     >
       <div className="space-y-12 pb-20">
         

@@ -14,7 +14,7 @@ import { useChartTheme } from '@/hooks/use-chart-theme';
 import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-container';
 import { SectionHeader } from '@/components/library/dna/shared';
 import { GeneDensityMap } from '@/components/library/genes/gene-density-map';
-import { Info, Map, Layers, Fingerprint, Anchor } from 'lucide-react';
+import { Info, Map, Fingerprint, Anchor } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
 
 export default function GeneDistributionPage() {
@@ -65,7 +65,7 @@ export default function GeneDistributionPage() {
   return (
     <LibraryShell 
       title="Genomic Distribution" 
-      subtitle="Spatial organization of genes and intronic discovery patterns."
+      subtitle="Gene counts per chromosome and per 1 Mb bin, CpG association and nested genes."
     >
       <div className="space-y-16 pb-20">
         
@@ -74,7 +74,7 @@ export default function GeneDistributionPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Global Gene Density" 
-              subtitle="Comparison of gene richness across the primary human chromosomes."
+              subtitle="Genes per chromosome and gene density."
             />
             <div className="px-3 py-1 bg-slate-50 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                <Map className="h-3 w-3" />
@@ -84,7 +84,7 @@ export default function GeneDistributionPage() {
 
           <GenomicChartContainer
             title="Genes per Chromosome"
-            subtitle="Raw count of annotated features for each canonical scaffold."
+            subtitle="Number of gene models per chromosome."
             isLoading={statsLoading}
             isError={statsError}
             onRetry={() => refetchStats()}
@@ -291,23 +291,11 @@ export default function GeneDistributionPage() {
                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Gene Richness</h4>
+                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Gene density</h4>
                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
                    {densityExtremes
                      ? `Gene density (genes per Mb) varies across chromosomes: highest on ${densityExtremes.hi.chrom} (${densityExtremes.hi.density.toFixed(1)}), lowest on ${densityExtremes.lo.chrom} (${densityExtremes.lo.density.toFixed(1)}).`
                      : 'Gene density varies across chromosomes.'}
-                 </p>
-              </div>
-           </div>
-           
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                 <Layers className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Intronic Discovery</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   Nested genes demonstrate the extreme spatial efficiency of the genome. Many small non-coding RNAs and even small protein-coding genes are embedded within the massive introns of host genes.
                  </p>
               </div>
            </div>

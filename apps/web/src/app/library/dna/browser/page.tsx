@@ -116,7 +116,7 @@ function GenomeBrowser({ activeGenome }: { activeGenome: keyof typeof genomeLeng
   };
 
   return (
-    <LibraryShell title="Genome Browser" subtitle="Interactive multi-track genome browser with semantic zoom.">
+    <LibraryShell title="Genome Browser" subtitle="Multi-track view of T2T-CHM13v2.0 (0-based coordinates).">
       <div className="space-y-6 pb-20">
         
         {/* CONTROL PANEL */}

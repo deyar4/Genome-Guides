@@ -42,7 +42,7 @@ export default function SpliceSitesPage() {
   return (
     <LibraryShell 
       title="Splice Junction Architecture" 
-      subtitle="Visualization of sequence consensus and Position Weight Matrices (PWMs) at intron-exon boundaries."
+      subtitle="Consensus and per-position nucleotide probabilities of donor and acceptor site dinucleotides."
     >
       <div className="space-y-12 pb-20">
         
@@ -86,9 +86,8 @@ export default function SpliceSitesPage() {
                  <Scissors className="h-6 w-6 text-primary" />
               </div>
               <div className="space-y-3">
-                 <h4 className="font-bold text-foreground uppercase text-xs tracking-widest">Molecular Logic</h4>
+                 <h4 className="font-bold text-foreground uppercase text-xs tracking-widest">Definition</h4>
                  <p className="text-sm text-slate-400 leading-relaxed">
-                   The {siteType} site is the highly conserved boundary where the spliceosome initiates the excision of an intron. 
                    The chart below shows the probability of each nucleotide at each position of the site dinucleotide, as served by the API (no information-content or log-odds transform).
                  </p>
               </div>

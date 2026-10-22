@@ -37,7 +37,7 @@ export default function RnaOverview() {
   return (
     <LibraryShell 
       title="RNA Transcriptomics" 
-      subtitle="Exploration of non-coding RNA biotypes, structural clusters, and splice site architecture."
+      subtitle="Non-coding RNA census, gene clusters and splice-site probabilities."
     >
       <div className="space-y-12 pb-20">
         
@@ -165,9 +165,9 @@ export default function RnaOverview() {
         {/* SECTION NAVIGATION */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
            {[
-             { title: 'RNA Clusters', desc: 'Explore dense arrays of tRNA, rRNA, and snRNA across the genome.', href: '/library/rna/clusters', icon: Shapes, color: 'text-blue-500' },
-             { title: 'Nested Genes', desc: 'Analyze spatial relationships where ncRNAs are hosted within introns.', href: '/library/rna/relationships', icon: Target, color: 'text-emerald-500' },
-             { title: 'Splice Junctions', desc: 'Visualize donor and acceptor consensus PWMs across the exome.', href: '/library/rna/splice-sites', icon: Activity, color: 'text-amber-500' },
+             { title: 'RNA Clusters', desc: 'Gene clusters by RNA type.', href: '/library/rna/clusters', icon: Shapes, color: 'text-blue-500' },
+             { title: 'Nested Genes', desc: 'Host and guest gene pairs (not available yet).', href: '/library/rna/relationships', icon: Target, color: 'text-emerald-500' },
+             { title: 'Splice Junctions', desc: 'Donor and acceptor site nucleotide probabilities.', href: '/library/rna/splice-sites', icon: Activity, color: 'text-amber-500' },
            ].map((section, i) => (
              <Card key={i} className="p-8 group hover:border-primary/50 transition-all cursor-pointer overflow-hidden relative">
                <div className={cn("h-12 w-12 rounded-2xl bg-slate-100 dark:bg-zinc-900 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform")}>

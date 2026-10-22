@@ -76,7 +76,7 @@ export default function RegionInspectorPage() {
   return (
     <LibraryShell 
       title="Region Inspector" 
-      subtitle="Detailed analysis of specific genomic coordinates, including sequence extraction and local composition."
+      subtitle="Sequence, base counts and windowed GC for a range of at most 100 kb (0-based, half-open)."
     >
       <div className="space-y-12 pb-20">
         

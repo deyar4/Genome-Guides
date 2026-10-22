@@ -37,7 +37,7 @@ export default function KmerExplorerPage() {
   return (
     <LibraryShell 
       title="K-Mer Explorer" 
-      subtitle="Oligonucleotide frequency analysis and motif discovery."
+      subtitle="Counts of overlapping k-mers (k = 3, 6) over the whole assembly."
     >
       <div className="space-y-12 pb-20">
         
@@ -92,7 +92,6 @@ export default function KmerExplorerPage() {
           <SectionHeader 
             title={`Top 20 Most Frequent ${kmerSize}-mers`}
             subtitle="Highest-count k-mers in the assembly, sorted by count."
-            badge="Frequency Distribution"
           />
           <Card className="p-8 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm h-[500px] flex flex-col mt-6">
              <div className="flex-1 min-h-0">

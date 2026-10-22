@@ -19,7 +19,7 @@ export function DinucleotideHeatmap({ data, isLoading, isError, onRetry }: Dinuc
   return (
     <GenomicChartContainer
       title="Dinucleotide Bias (O/E Ratio)"
-      subtitle="Observed vs Expected frequency reveals chemical selection pressures (e.g. CpG suppression)."
+      subtitle="Observed frequency divided by the frequency expected from the single-base frequencies."
       isLoading={isLoading}
       isError={isError}
       onRetry={onRetry}

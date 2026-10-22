@@ -12,7 +12,7 @@ import { GenomicChartContainer } from '@/components/library/dna/genomic-chart-co
 import { GenomicMetricCard } from '@/components/library/dna/genomic-metric-card';
 import { SectionHeader } from '@/components/library/dna/shared';
 import { BiotypeTreemap } from '@/components/library/genes/biotype-treemap';
-import { BookOpen, List, Trophy, Maximize, Layers } from 'lucide-react';
+import { List, Trophy, Maximize, Layers } from 'lucide-react';
 import Link from 'next/link';
 
 export default function GeneCensusPage() {
@@ -45,7 +45,7 @@ export default function GeneCensusPage() {
   return (
     <LibraryShell 
       title="Biotype Census" 
-      subtitle="Numerical breakdown of functional and non-functional genomic elements."
+      subtitle="Gene counts by biotype."
     >
       <div className="space-y-12 pb-20">
         
@@ -60,13 +60,13 @@ export default function GeneCensusPage() {
            <GenomicMetricCard 
              label="Protein Coding"
              value={proteinCodingCount > 0 ? formatNumber(proteinCodingCount) : '...'}
-             description="Functional protein-encoding gene models."
+             description="Genes with biotype protein_coding."
              color="#10b981"
            />
            <GenomicMetricCard 
              label="Biotype Diversity"
              value={biotypes?.length.toString() || '0'}
-             description="Number of distinct biological classifications."
+             description="Number of distinct biotype values."
              color="#8b5cf6"
            />
         </div>
@@ -74,7 +74,7 @@ export default function GeneCensusPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-stretch">
           <GenomicChartContainer
             title="Biotype Hierarchy"
-            subtitle="Hierarchical distribution of genomic elements by biological classification."
+            subtitle="Gene count per biotype."
             isLoading={isLoading}
             isError={isError}
             height="h-[500px]"
@@ -87,7 +87,7 @@ export default function GeneCensusPage() {
             <div className="flex items-center justify-between mb-6">
                <SectionHeader 
                  title="Biotype Registry" 
-                 subtitle="Comprehensive inventory of all annotated feature types."
+                 subtitle="Gene count per biotype."
                />
                <div className="px-3 py-1 bg-slate-50 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <List className="h-3 w-3" />
@@ -188,18 +188,6 @@ export default function GeneCensusPage() {
           </div>
         </section>
 
-        {/* ACADEMIC FOOTER */}
-        <div className="p-8 bg-slate-50 dark:bg-zinc-900/50 rounded-3xl border border-slate-200 dark:border-zinc-800 flex gap-6 items-start">
-           <div className="h-12 w-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-              <BookOpen className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-           </div>
-           <div className="space-y-2">
-              <h4 className="font-bold text-slate-900 dark:text-zinc-100 uppercase text-xs tracking-widest">Understanding Biotypes</h4>
-              <p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-3xl">
-                Biotypes classify genomic features based on their biological properties. While protein-coding genes are the most well-known, the human genome is rich in non-coding RNA (lncRNA, snRNA, etc.) and pseudogenes—evolutionary relics that provide insight into genomic history and regulation.
-              </p>
-           </div>
-        </div>
 
       </div>
     </LibraryShell>

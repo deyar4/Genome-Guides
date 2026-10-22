@@ -74,7 +74,7 @@ export default function GeneFactSheetPage() {
           <GenomicMetricCard 
             label="Gene Biotype"
             value={gene.biotype?.replace('_', ' ') || 'N/A'}
-            description="Biological classification of this feature."
+            description="Biotype from the annotation."
             color="#10b981"
           />
           <GenomicMetricCard 
@@ -100,7 +100,7 @@ export default function GeneFactSheetPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Architecture Visualizer" 
-              subtitle="Interactive track showing exon/intron structure for all annotated transcripts."
+              subtitle="Exons of each transcript to scale over the gene span."
             />
           </div>
           <Card className="p-8 border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
@@ -128,7 +128,7 @@ export default function GeneFactSheetPage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Structural Architecture" 
-              subtitle="Detailed breakdown of transcript models and exonic coordinates."
+              subtitle="Exon coordinates per transcript."
             />
             <div className="px-3 py-1 bg-slate-50 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                <Layers className="h-3 w-3" />
@@ -200,11 +200,9 @@ export default function GeneFactSheetPage() {
                  <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center mb-6">
                     <Activity className="h-6 w-6 text-primary" />
                  </div>
-                 <h3 className="text-2xl font-bold tracking-tight mb-4">Transcription Summary</h3>
+                 <h3 className="text-2xl font-bold tracking-tight mb-4">First transcript</h3>
                  <p className="text-slate-400 leading-relaxed text-sm">
-                   The coordinates listed above represent the physical mapping of exons within the primary assembly. 
-                   During transcription, these segments are joined together to form the mature mRNA molecule, 
-                   with introns being precisely excised by the spliceosome.
+                   Exon coordinates are listed per transcript above; the two values refer to the first transcript.
                  </p>
               </div>
               <div className="grid grid-cols-2 gap-6">

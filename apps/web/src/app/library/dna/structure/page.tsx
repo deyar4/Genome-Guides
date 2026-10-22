@@ -20,6 +20,7 @@ import {
   Map,
 } from 'lucide-react';
 import { cn, formatNumber } from '@/lib/utils';
+import { TELOMERE_END_TOLERANCE_BP } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function DNAStructurePage() {
@@ -40,8 +41,8 @@ export default function DNAStructurePage() {
       const ts = telomeres.data?.filter(t => t.chrom === c.name) || [];
       // The API labels every record 't2t_telomeres' (no 5'/3' field), so the end is derived from
       // coordinates: a record starting at 0 is the 5' end, one ending at the chromosome length the 3' end.
-      const hasFive = ts.some(t => t.position === 0);
-      const hasThree = ts.some(t => t.end === c.length);
+      const hasFive = ts.some(t => t.position <= TELOMERE_END_TOLERANCE_BP);
+      const hasThree = ts.some(t => t.end >= c.length - TELOMERE_END_TOLERANCE_BP);
       const hasCen = centromeres.data?.some(cen => {
         const cName = c.name.replace('chr', '');
         const cenName = (cen.chrom || '').replace('chr', '');
@@ -84,7 +85,7 @@ export default function DNAStructurePage() {
   return (
     <LibraryShell 
       title="Structural Landscape" 
-      subtitle="Evaluation of assembly integrity, telomeric caps, and centromeric regions."
+      subtitle="Telomere and centromere records, GC-class runs and CpG records."
     >
       <div className="space-y-12 pb-20">
         
@@ -126,7 +127,7 @@ export default function DNAStructurePage() {
           <div className="flex items-center justify-between mb-6">
             <SectionHeader 
               title="Structural Integrity Matrix" 
-              subtitle="Verification of landmark elements for each primary chromosome scaffold."
+              subtitle="Telomere records at both chromosome ends and centromere records, per chromosome."
             />
             <div className="px-3 py-1 bg-slate-100 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-500 uppercase tracking-tight flex items-center gap-2">
                <Map className="h-3 w-3" />
@@ -209,7 +210,7 @@ export default function DNAStructurePage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
            <GenomicChartContainer
              title="GC-class runs (1 kb windows)"
-             subtitle="Bernardi's classification of chromosomal segments by GC content."
+             subtitle="Runs of consecutive 1 kb windows in the same GC class."
              isLoading={isochores.isLoading}
              isError={isochores.isError}
              onRetry={() => isochores.refetch()}
@@ -245,7 +246,7 @@ export default function DNAStructurePage() {
 
            <GenomicChartContainer
              title="CpG Island Records"
-             subtitle="Detected regulatory clusters using Gardiner-Garden & Frommer criteria."
+             subtitle="CpG records from the pipeline track (200 bp windows with GC content and observed/expected CpG)."
              isLoading={cpgIslands.isLoading}
              isError={cpgIslands.isError}
              onRetry={() => cpgIslands.refetch()}
@@ -260,39 +261,14 @@ export default function DNAStructurePage() {
                     {cpgIslands.data && cpgIslands.data.length >= 1000 && (
                       <p className="text-[10px] text-amber-600 mt-2 max-w-[260px]">The API returns at most 1,000 records (200 bp each, adjacent ones not merged), so the genome-wide total is not shown.</p>
                     )}
-                    <p className="text-[10px] text-slate-500 mt-4 max-w-[200px]">
-                      Highly conserved regions often associated with gene promoters and transcription start sites.
-                    </p>
                  </div>
               </div>
            </GenomicChartContainer>
         </div>
 
-        {/* STRUCTURAL LANDMARKS EXPLAINED */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <Card className="p-8 bg-slate-50 dark:bg-zinc-900 border-none shadow-none">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest mb-4 flex items-center gap-2">
-                 <Shield className="h-4 w-4 text-emerald-500" />
-                 Telomeres (Assembly Caps)
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                TTAGGG hexameric repeats that protect chromosome ends from degradation and fusion. 
-                Bi-terminal status confirms the assembly reaches the physical ends of the linear DNA molecule.
-              </p>
-           </Card>
-
-           <Card className="p-8 bg-slate-50 dark:bg-zinc-900 border-none shadow-none">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-widest mb-4 flex items-center gap-2">
-                 <Target className="h-4 w-4 text-blue-500" />
-                 Centromeres (Segregation Hubs)
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed">
-                Landmarks for spindle attachment during mitosis. Typically composed of alpha-satellite DNA.
-                Annotation confirms the assembly spans the highly repetitive pericentromeric regions.
-              </p>
-           </Card>
-        </div>
-
+        <p className="text-xs text-slate-500">
+          Bi-terminal: a telomere record starts at 0 and another ends at the chromosome length (tolerance {TELOMERE_END_TOLERANCE_BP} bp). The API gives no repeat sequence or 5&apos;/3&apos; label for telomere records. Centromere regions are the records of the centromere track.
+        </p>
       </div>
     </LibraryShell>
   );

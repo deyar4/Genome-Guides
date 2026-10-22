@@ -46,7 +46,7 @@ export default function RnaClustersPage() {
   return (
     <LibraryShell 
       title="RNA Clusters" 
-      subtitle="High-density genomic hubs where multiple non-coding RNA genes are co-located."
+      subtitle="Gene clusters per RNA type from the pipeline track."
     >
       <div className="space-y-8 pb-20">
         

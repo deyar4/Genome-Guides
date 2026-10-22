@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Info } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export default function RnaRelationshipsPage() {
   const { activeGenome } = useGenomeStore();
@@ -29,23 +29,10 @@ export default function RnaRelationshipsPage() {
   return (
     <LibraryShell 
       title="Nested Genes" 
-      subtitle="Exploration of spatial relationships where non-coding RNAs are located within the boundaries of host genes."
+      subtitle="Pairs of a host gene and a guest gene located within it."
     >
       <div className="space-y-8 pb-20">
         
-        <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 dark:border-blue-800 flex gap-6 items-start">
-           <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-           </div>
-           <div className="space-y-2">
-              <h4 className="font-bold text-blue-900 dark:text-blue-100">Genomic Nesting</h4>
-              <p className="text-sm text-blue-700/80 dark:text-blue-300/80 leading-relaxed">
-                Many ncRNAs (especially miRNAs, snoRNAs, and snRNAs) are found within the introns or even exons of protein-coding &quot;host&quot; genes. 
-                These guest genes are often co-transcribed with their host or regulated by the host&apos;s promoter.
-              </p>
-           </div>
-        </div>
-
         {/* RELATIONSHIPS TABLE */}
         <Card className="border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
           <Table>

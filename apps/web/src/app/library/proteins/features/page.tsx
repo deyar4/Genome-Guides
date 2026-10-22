@@ -40,7 +40,7 @@ export default function ProteinFeaturesPage() {
   return (
     <LibraryShell 
       title="Protein Feature Discovery" 
-      subtitle="Identification of proteomic outliers: from massive polypeptides to low-complexity homopolymer tracts."
+      subtitle="Longest protein records and longest single-residue tracts."
     >
       <div className="space-y-8 pb-20">
         

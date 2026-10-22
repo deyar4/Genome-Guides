@@ -24,7 +24,7 @@ import {
 } from 'recharts';
 import { useChartTheme } from '@/hooks/use-chart-theme';
 import { formatNumber, alignToBaseWindow } from '@/lib/utils';
-import { Loader2, MoveHorizontal, Info } from 'lucide-react';
+import { Loader2, MoveHorizontal } from 'lucide-react';
 
 interface ChromosomeBrowserProps {
   chromosomes: { name: string; length: number }[];
@@ -74,7 +74,7 @@ export function ChromosomeBrowser({ chromosomes, initialChrom }: ChromosomeBrows
             <MoveHorizontal className="h-5 w-5 text-primary" />
             Genomic Landscape Browser
           </h3>
-          <p className="text-xs text-slate-500">Interactive exploration of sequence composition and assembly quality.</p>
+          <p className="text-xs text-slate-500">GC content (%) per window; the brush selects a range.</p>
         </div>
 
         <Select value={selectedChrom} onValueChange={setSelectedChrom}>
@@ -192,13 +192,6 @@ export function ChromosomeBrowser({ chromosomes, initialChrom }: ChromosomeBrows
         </div>
       </Card>
 
-      <div className="flex gap-4 p-4 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
-        <Info className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-          The <strong>Genomic Landscape Browser</strong> visualizes local GC content variation using a sliding window analysis. 
-          Use the <strong>Brush tool</strong> at the bottom to zoom into specific regions and observe fine-grained structural variation.
-        </p>
-      </div>
     </div>
   );
 }

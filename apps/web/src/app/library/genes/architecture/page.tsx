@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatNumber } from '@/lib/utils';
 import { SectionHeader } from '@/components/library/dna/shared';
-import { Layers, Info, Trophy, Layout } from 'lucide-react';
+import { Trophy, Layout } from 'lucide-react';
 
 export default function GeneArchitecturePage() {
   const { activeGenome } = useGenomeStore();
@@ -34,7 +34,7 @@ export default function GeneArchitecturePage() {
   return (
     <LibraryShell 
       title="Architecture & Size" 
-      subtitle="Structural properties and extreme dimensions of the functional genome."
+      subtitle="Length statistics of gene models, exons and introns."
     >
       <div className="space-y-16 pb-20">
         
@@ -43,7 +43,7 @@ export default function GeneArchitecturePage() {
           <div className="flex items-center justify-between mb-8">
             <SectionHeader 
               title="Canonical Scale" 
-              subtitle="The average dimensions of genomic features across the reference assembly."
+              subtitle="Median, mean and maximum length in bp."
             />
             <div className="px-3 py-1 bg-slate-50 dark:bg-zinc-900 rounded-full border border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                <Layout className="h-3 w-3" />
@@ -56,21 +56,21 @@ export default function GeneArchitecturePage() {
               title="Whole Gene Span" 
               stats={sizeStats?.genes} 
               unit="bp" 
-              description="Total genomic footprint from transcription start to end."
+              description="Gene model end minus start."
               color="blue"
             />
             <DimensionCard 
               title="Exon Length" 
               stats={sizeStats?.exons} 
               unit="bp" 
-              description="The functional segments that remain after splicing."
+              description="Length of each annotated exon."
               color="emerald"
             />
             <DimensionCard 
               title="Intron Length" 
               stats={sizeStats?.introns} 
               unit="bp" 
-              description="Non-coding regions removed during maturation."
+              description="Length of each annotated intron."
               color="amber"
             />
           </div>
@@ -181,32 +181,6 @@ export default function GeneArchitecturePage() {
           </Tabs>
         </section>
 
-        {/* FOOTER INFO */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                 <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Scale Variation</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   While the average human gene is ~30kb, some like DMD (Dystrophin) span over 2 megabases, taking the cell several hours to transcribe a single molecule.
-                 </p>
-              </div>
-           </div>
-           
-           <div className="flex gap-4 p-6 bg-slate-50 dark:bg-zinc-900/50 rounded-2xl border border-slate-200/50 dark:border-zinc-800/50">
-              <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                 <Layers className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                 <h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-tight mb-1">Exonic Density</h4>
-                 <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
-                   Most human exons are remarkably short (~150bp), while introns can be hundreds of kilobases long, requiring precise machinery for accurate removal.
-                 </p>
-              </div>
-           </div>
-        </div>
 
       </div>
     </LibraryShell>
